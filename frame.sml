@@ -8,6 +8,13 @@ sig
   val formals: frame -> access list
   val allocLocal: frame -> bool -> access
   (* true if if the new variable escapes and needs to go in the frame. false -> can be allocated in register. *)
+
+  val RV : Temp.temp (* as seen by callee*)
+
+  datatype frag = PROC of {body: Tree.stm, frame: frame}
+		| STRING of Temp.label * string
+  val procEntryExit1 : frame * Tree.stm -> Tree.stm
+
   (* more...  *)
 end				    
 
