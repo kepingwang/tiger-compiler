@@ -1,0 +1,5 @@
+let
+    type x = int
+    type y = string
+in
+end

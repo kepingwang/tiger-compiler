@@ -1,0 +1,10 @@
+let 
+    var x := 1
+    type X = { y : Y,  x : X}
+    type Y = { x : X, y : Y}
+    type Z = { m : M }
+    type M =  { z : Z}
+    var z:Z := nil
+in
+    z.m := nil
+end

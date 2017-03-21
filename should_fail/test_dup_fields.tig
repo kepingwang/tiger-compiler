@@ -1,0 +1,6 @@
+let 
+    type a = {a:int, b:string, a:c}
+    type c = a
+in
+    1
+end

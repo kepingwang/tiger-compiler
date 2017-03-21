@@ -1,0 +1,11 @@
+let 
+    type a = b
+    type b = c
+    type c = d
+    type d = e
+    type e = int
+    var z:a := 1
+    var y:c := 1
+in
+    z + y
+end

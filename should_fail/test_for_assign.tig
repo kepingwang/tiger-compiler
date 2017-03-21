@@ -1,0 +1,11 @@
+let
+    var y : int := 5
+    var z := 5
+in
+    for x := 1 to 5 do 
+(
+    y := 100;
+    z := 100;
+    x := 100
+)
+end

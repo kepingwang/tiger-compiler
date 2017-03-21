@@ -1,0 +1,320 @@
+structure A = Absyn
+%%
+%term
+    EOF
+  | ID of string
+  | INT of int | STRING of string
+  | COMMA | COLON | SEMICOLON | LPAREN | RPAREN | LBRACK | RBRACK
+  | LBRACE | RBRACE | DOT
+  | PLUS | MINUS | TIMES | DIVIDE | EQ | NEQ | LT | LE | GT | GE
+  | AND | OR | ASSIGN
+  | ARRAY | IF | THEN | ELSE | WHILE | FOR | TO | DO | LET | IN | END | OF
+  | BREAK | NIL
+  | FUNCTION | VAR | TYPE
+  | LESS
+
+%nonterm  exp of A.exp
+        | program of A.exp
+        | dec of A.dec
+        | tydec of {name: A.symbol, ty: A.ty, pos: A.pos}
+        | tydeclist of {name: A.symbol, ty: A.ty, pos: A.pos} list
+        | tydeclisttail of {name: A.symbol, ty: A.ty, pos: A.pos} list
+        | ty of A.ty
+        | tyfields of A.field list
+        | tyfieldstail of A.field list
+        | vardec of A.dec
+        | fundec of A.fundec
+        | fundeclist of A.fundec list
+        | fundeclisttail of A.fundec list
+        | lvalue of A.var
+        | seqexp of A.exp
+        | expstar of (A.exp * A.pos) list
+        | expstartail of (A.exp * A.pos) list
+        | negation of A.exp
+        | callexp of A.exp
+        | callexptail of A.exp list
+        | infixexp of A.exp
+        | arraycreate of A.exp
+        | recordcreate of A.exp
+        | fieldcreate of (A.symbol * A.exp * A.pos) list
+        | fieldcreatetail of (A.symbol * A.exp * A.pos) list
+        | assignment of A.exp
+        | ifthenelse of A.exp
+        | ifthen of A.exp
+        | whileexp of A.exp
+        | forexp of A.exp
+        | letexp of A.exp
+        | decs of A.dec list
+        | arrayindex of A.symbol * A.exp * A.pos
+
+%pos int
+%verbose
+%start program
+%eop EOF
+%noshift EOF
+
+%name Tiger
+
+%keyword WHILE FOR TO BREAK LET IN END FUNCTION VAR TYPE ARRAY IF THEN ELSE
+	DO OF NIL
+
+%prefer THEN ELSE LPAREN
+
+%value ID ("bogus")
+%value INT (1)
+%value STRING ("")
+
+%nonassoc LESS
+%nonassoc FUNCTION
+%nonassoc TYPE
+%nonassoc DO OF THEN
+%nonassoc ELSE
+%right ASSIGN
+%left OR
+%left AND
+%nonassoc EQ NEQ GT LT GE LE
+%left PLUS MINUS
+%left TIMES DIVIDE
+%%
+
+(* This is a skeleton grammar file, meant to illustrate what kind of
+ * declarations are necessary above the %% mark.  Students are expected
+ *  to replace the two dummy productions below with an actual grammar. 
+ *)
+
+program	: exp (exp)
+dec : tydeclist (A.TypeDec tydeclist)
+    | vardec (vardec)
+    | fundeclist (A.FunctionDec fundeclist)
+tydeclist : tydec tydeclisttail %prec LESS (tydec::tydeclisttail)
+tydeclisttail : %prec LESS ([])
+              | tydec tydeclisttail %prec LESS (tydec::tydeclisttail)
+tydec : TYPE ID EQ ty ({name=Symbol.symbol ID, ty=ty, pos=TYPEleft})
+ty : ID (A.NameTy (Symbol.symbol ID, IDleft))
+   | ARRAY OF ID (A.ArrayTy (Symbol.symbol ID, ARRAYleft))
+   | LBRACE tyfields RBRACE (A.RecordTy tyfields)
+tyfields : ([])
+         | ID COLON ID tyfieldstail ({
+                                        name = Symbol.symbol ID1,
+                                        escape = ref true,
+                                        typ = Symbol.symbol ID2,
+                                        pos = ID1left
+                                    } :: tyfieldstail)
+tyfieldstail : ([])
+             | COMMA ID COLON ID tyfieldstail ({
+                                                  name = Symbol.symbol ID1,
+                                                  escape = ref true,
+                                                  typ = Symbol.symbol ID2,
+                                                  pos = ID1left
+                                              } :: tyfieldstail)
+vardec : VAR ID ASSIGN exp (A.VarDec {
+                                 name = Symbol.symbol ID,
+                                 escape = ref true,
+                                 typ = NONE,
+                                 init = exp,
+                                 pos = VARleft
+                           })
+       | VAR ID COLON ID ASSIGN exp (A.VarDec {
+                                          name = Symbol.symbol ID1,
+                                          escape = ref true,
+                                          typ = SOME(Symbol.symbol ID2, ID2left),
+                                          init =exp,
+                                          pos = VARleft
+                                    })
+fundeclist : fundec fundeclisttail %prec LESS (fundec :: fundeclisttail)
+fundeclisttail : %prec LESS ([])
+               | fundec fundeclisttail %prec LESS (fundec :: fundeclisttail)
+fundec : FUNCTION ID LPAREN tyfields RPAREN EQ exp ({
+                                                       name = Symbol.symbol ID,
+                                                       params = tyfields,
+                                                       result = NONE,
+                                                       body = exp,
+                                                       pos = FUNCTIONleft
+                                                   })
+       | FUNCTION ID LPAREN tyfields RPAREN COLON ID EQ exp ({
+                                                                name = Symbol.symbol ID1,
+                                                                params = tyfields,
+                                                                result = SOME(Symbol.symbol ID2, ID2left),
+                                                                body = exp,
+                                                                pos = FUNCTIONleft
+                                                            })
+arrayindex : ID LBRACK exp RBRACK ( (Symbol.symbol ID, exp, LBRACKleft))
+lvalue : ID ( A.SimpleVar (Symbol.symbol ID, IDleft))
+       | arrayindex ( let val (sym, exp, pos) = arrayindex
+                          val var = A.SimpleVar (sym, pos)
+                      in
+                          A.SubscriptVar (var, exp, pos)
+                      end
+                    )
+       | lvalue DOT ID ( A.FieldVar(lvalue, Symbol.symbol ID, DOTleft))
+       | lvalue DOT arrayindex ( let val (sym, exp, pos) = arrayindex
+                                     val dot = A.FieldVar (lvalue, sym, DOTleft)
+                                 in
+                                     A.SubscriptVar (dot, exp, pos)
+                                 end
+                               )
+exp : lvalue (A.VarExp lvalue)
+    | NIL (A.NilExp)
+    | INT (A.IntExp INT)
+    | STRING (A.StringExp (STRING, STRINGleft))
+    | seqexp (seqexp)
+    | negation (negation)
+    | callexp (callexp)
+    | infixexp (infixexp)
+    | arraycreate (arraycreate)
+    | recordcreate (recordcreate)
+    | assignment (assignment)
+    | ifthenelse (ifthenelse)
+    | ifthen (ifthen)
+    | whileexp (whileexp)
+    | forexp (forexp)
+    | BREAK (A.BreakExp BREAKleft)
+    | letexp (letexp)
+seqexp : LPAREN expstar RPAREN (A.SeqExp expstar)
+expstar : exp expstartail ((exp, expleft)::expstartail)
+        | ([])
+expstartail : SEMICOLON exp expstartail ((exp, expleft)::expstartail)
+           | ([])
+negation : MINUS exp (A.OpExp {
+                           left = A.IntExp 0,
+                           oper = A.MinusOp,
+                           right = exp,
+                           pos = MINUSleft
+                     })
+callexp : ID LPAREN exp callexptail RPAREN (A.CallExp {
+                                                 func = Symbol.symbol ID,
+                                                 args = exp::callexptail,
+                                                 pos = IDleft
+                                           })
+        | ID LPAREN RPAREN (A.CallExp {
+                                 func = Symbol.symbol ID,
+                                 args = [],
+                                 pos = IDleft
+                           })
+callexptail : COMMA exp callexptail (exp :: callexptail)
+            | ([])
+infixexp : exp PLUS exp (A.OpExp {
+                              left = exp1,
+                              oper = A.PlusOp,
+                              right = exp2,
+                              pos = PLUSleft
+                        })
+         | exp MINUS exp (A.OpExp {
+                               left = exp1,
+                               oper = A.MinusOp,
+                               right = exp2,
+                               pos = MINUSleft
+                         })
+         | exp TIMES exp(A.OpExp {
+                              left = exp1,
+                              oper = A.TimesOp,
+                              right = exp2,
+                              pos = TIMESleft
+                        })
+         | exp DIVIDE exp(A.OpExp {
+                               left = exp1,
+                               oper = A.DivideOp,
+                               right = exp2,
+                               pos = DIVIDEleft
+                         })
+         | exp EQ exp(A.OpExp {
+                           left = exp1,
+                           oper = A.EqOp,
+                           right = exp2,
+                           pos = EQleft
+                     })
+         | exp NEQ exp(A.OpExp {
+                            left = exp1,
+                            oper = A.NeqOp,
+                            right = exp2,
+                            pos = NEQleft
+                      })
+         | exp LT exp(A.OpExp {
+                           left = exp1,
+                           oper = A.LtOp,
+                           right = exp2,
+                           pos = LTleft
+                     })
+         | exp LE exp(A.OpExp {
+                           left = exp1,
+                           oper = A.LeOp,
+                           right = exp2,
+                           pos = LEleft
+                     })
+         | exp GT exp(A.OpExp {
+                           left = exp1,
+                           oper = A.GtOp,
+                           right = exp2,
+                           pos = GTleft
+                     })
+         | exp GE exp(A.OpExp {
+                           left = exp1,
+                           oper = A.GeOp,
+                           right = exp2,
+                           pos = GEleft
+                     })
+         | exp AND exp(A.IfExp {
+                            test = exp1,
+                            then' = exp2,
+                            else' = SOME(A.IntExp 0),
+                            pos = ANDleft
+                      })
+         | exp OR exp(A.IfExp {
+                           test = exp1,
+                           then' = A.IntExp 1,
+                           else' = SOME(exp2),
+                           pos = ORleft
+                     })
+arraycreate : arrayindex OF exp (
+               let val (sym, size, _) = arrayindex
+               in
+                   A.ArrayExp {
+                       typ = sym,
+                       size = size,
+                       init = exp,
+                       pos = arrayindexleft
+                   }
+               end
+           )
+recordcreate : ID fieldcreate  (A.RecordExp {
+                                     fields = fieldcreate,
+                                     typ = Symbol.symbol ID,
+                                     pos = IDleft
+                               })
+fieldcreate : LBRACE RBRACE([])
+            | LBRACE ID EQ exp fieldcreatetail ((Symbol.symbol ID, exp, IDleft)::fieldcreatetail)
+fieldcreatetail : COMMA ID EQ exp fieldcreatetail ((Symbol.symbol ID, exp, IDleft)::fieldcreatetail)
+                | RBRACE ([])
+assignment : lvalue ASSIGN exp (A.AssignExp {
+                                     var = lvalue,
+                                     exp = exp,
+                                     pos = ASSIGNleft
+                               })
+ifthenelse : IF exp THEN exp ELSE exp (A.IfExp {
+                                            test = exp1,
+                                            then' = exp2,
+                                            else' = SOME(exp3),
+                                            pos = IFleft
+                                      })
+ifthen : IF exp THEN exp (A.IfExp {
+                               test = exp1,
+                               then' = exp2,
+                               else' = NONE,
+                               pos = IFleft
+                         })
+whileexp : WHILE exp DO exp (A.WhileExp {
+                                  test = exp1,
+                                  body = exp2,
+                                  pos = WHILEleft
+                            })
+forexp : FOR ID ASSIGN exp TO exp DO exp (A.ForExp {
+                                               var = Symbol.symbol ID,
+                                               escape = ref true,
+                                               lo = exp1,
+                                               hi = exp2,
+                                               body = exp3,
+                                               pos = FORleft
+                                         })
+letexp : LET decs IN expstar END (A.LetExp {decs=decs, body=A.SeqExp expstar, pos=LETleft})
+decs : dec decs (dec::decs)
+     | ([])
