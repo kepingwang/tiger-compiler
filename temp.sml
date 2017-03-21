@@ -1,4 +1,7 @@
 (* make this an abstraction sometime *)
+(* TEMP is used to represent a value temporarily held in a register. *)
+(* Temps are abstract names for label variables. *)
+(* Labels are abstract names for static memory addresses. *)
 structure Temp : TEMP =
 struct
     type temp = int

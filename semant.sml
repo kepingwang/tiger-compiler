@@ -10,9 +10,9 @@ val err = ErrorMsg.error
 type venv = E.enventry Symbol.table
 type tenv = T.ty Symbol.table
 
-(* Translate module is reserved for intermediate code *)
-structure Translate = struct type exp = unit end
-type expty = {exp: Translate.exp, ty: T.ty}
+structure Trans = Translate
+		 
+type expty = {exp: Trans.exp, ty: T.ty}
 
 val loop_nest_level = ref 0
 
@@ -492,11 +492,11 @@ and transTy (tenv, A.NameTy(tid,pos)) =
         | NONE => (err pos ("cannot find array type"^S.name tid); T.BOTTOM)
     )
 
-fun transProg (exp:A.exp) : unit =
+fun transProg (exp:A.exp) : Tree.exp =
   let
       val expty = transExp(E.base_venv, E.base_tenv) exp
   in
-      ()
+      #exp expty
   end
 
 
