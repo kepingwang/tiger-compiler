@@ -14,6 +14,10 @@ structure Trans = Translate
 		 
 type expty = {exp: Trans.exp, ty: T.ty}
 
+(* IR: transDec and transExp will all require an extra parameter of current level *)
+(* {venv, tenv} becomes {venv, tenv, level} *)
+(* IR: FindEscape *)
+
 val loop_nest_level = ref 0
 
 fun say s = TextIO.output (TextIO.stdOut, s ^"\n")
@@ -143,9 +147,8 @@ fun findSuperType a b = if isSubTypeOf a b
                             then b
                             else T.BOTTOM
 
-(* TODO in general: what type to return when err? Now I return T.INT *)
-
-fun transExp (venv:venv, tenv:tenv) =
+(* IR *)
+fun transExp (venv:venv, tenv:tenv, Trans.level:level) =
   let
       fun trexp (A.VarExp(var)) = trvar var
         | trexp (A.NilExp) = {exp=(),ty=T.NIL}
@@ -351,7 +354,8 @@ fun transExp (venv:venv, tenv:tenv) =
       and trvar (A.SimpleVar(id, pos)) =
           (
             case S.look(venv,id) of
-	            SOME(E.VarEntry{ty=var_ty}) => {exp=(), ty=actualTy var_ty}
+		(* IR *)
+	            SOME(E.VarEntry{access, ty=var_ty}) => {exp=Trans.simpleVar(access, level), ty=actualTy var_ty}
 	          | _ =>
                 (
 	              err pos ("Undefined variable " ^ S.name id);
@@ -389,7 +393,12 @@ fun transExp (venv:venv, tenv:tenv) =
   end
 and transDec (venv,tenv,A.FunctionDec(fundecs)) : {venv:venv,tenv:tenv} =
     let
-        fun addFunDec ({name=func_name, params, result, body, pos}, venv) =
+      (* IR: FunEntry now becomes {level: Trans.level, label: Temp.label, ...} *)
+      val escList = TODO
+      val label = Temp.newlabel()
+      val level = Trans.newLevel {parent=level, name=label, formals: escList}
+      (* label is used for generating newLevel, and also stored in FunEntry *)
+      fun addFunDec ({name=func_name, params, result, body, pos}, venv) =
           let
               fun findParamType {name=var_name, escape, typ=type_name, pos} = lookT (tenv, type_name, pos)
               val formals_ty = map findParamType params
@@ -421,8 +430,11 @@ and transDec (venv,tenv,A.FunctionDec(fundecs)) : {venv:venv,tenv:tenv} =
     end
   | transDec (venv,tenv,A.VarDec{name,escape,typ=type_option,init,pos}) =
     let
-        (*If the init exp is "Nil" then the type can only be type_optoin *)
-        val {exp=init_exp,ty=init_ty} = transExp (venv,tenv) init
+      (*If the init exp is "Nil" then the type can only be type_optoin *)
+      val {exp=init_exp,ty=init_ty} = transExp (venv,tenv) init
+      (* IR: put this access into VarEntry *)
+      val access = Trans.allocLocal level escape
+      (* IR: for initialization, return an Tree.exp list *)
     in
         case type_option of
             SOME(type_name, pos) =>
@@ -494,9 +506,10 @@ and transTy (tenv, A.NameTy(tid,pos)) =
 
 fun transProg (exp:A.exp) : Tree.exp =
   let
-      val expty = transExp(E.base_venv, E.base_tenv) exp
+    (* IR *)
+    val expty = transExp(E.base_venv, E.base_tenv, Trans.outermost) exp
   in
-      #exp expty
+    ()
   end
 
 

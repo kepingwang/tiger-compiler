@@ -14,7 +14,9 @@ sig
   datatype frag = PROC of {body: Tree.stm, frame: frame}
 		| STRING of Temp.label * string
   val procEntryExit1 : frame * Tree.stm -> Tree.stm
-
+  val FP : Temp.temp (* frame pointer *)
+  val wordSize : int
+  val exp : access -> Tree.exp -> Tree.exp
   (* more...  *)
 end				    
 
@@ -22,6 +24,9 @@ structure Frame : FRAME = MipsFrame
 			    
 structure MipsFrame : FRAME =
 struct
+
+type T = Tree : TREE
+
 (* formals are function parameters *)
 (* frame is a data structure holding: *)
 (* 1. locations of all formals *)
@@ -68,4 +73,13 @@ fun allocLocal FrameDict{name, formals, locals} esc =
     FrameDict {name, formals, newLocal::locals}
   end
 
+val FP = Temp.newtemp() (* frame pointer *)
+val wordSize = 8 (* ? *)
+fun exp access (T.TEMP(fp)) =
+  (* used to turn a Frame.access into Tree.exp*)
+  case access of
+      InFrame(k) => T.MEM(T.BINOP(T.PLUS, T.TEMP(FP), T.CONST(k))
+    | InReg(tempReg) => T.TEMP(tempReg)
+						   
+    
 end

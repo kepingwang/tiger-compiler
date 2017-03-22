@@ -1,16 +1,21 @@
 signature TRANSLATE =
 sig
   type level
-  type access (* not the same as Frame.access*)
+  type access (* not the same as Frame.access *) (* access of a var*)
 
   val outermost : level
-  val newLevel : {
+  val newLevel : { (* newLevel calls newFrame *)
+    (* semant.sml only knows about level, doesn't know about frame *)
+    (* when calling Frame.newFrame, Translate passes static link as
+     an extra escaped parameter. Frame.newFrame(label, true::formals) *)
     parent: level,
     name: Temp.label,
     formals: bool list
   } -> level
   val formals : level -> access list
+  (* get the formals without the static link *)
   val allocLocal : level -> bool -> access
+				      
 
   type exp
   val unEx : exp -> Tree.exp
@@ -47,6 +52,12 @@ type frag = Frame.frag
 val fragList = []
 fun getResult () = fragList
 
+fun getLevelFP level = T.TEMP(Frame.FP) (* ??? *)
+		     
+fun simpleVar (access, level) =
+  (* this access is first generated from Translate.allocLocal *)
+  Frame.exp access (getLevelFP level)
+		     
 fun transFun fundec : Tree.stm = (* build everything to a Tree.stm *)
   let
   (* Prologue *)
@@ -71,6 +82,5 @@ fun transFun fundec : Tree.stm = (* build everything to a Tree.stm *)
     ()
   end
     
-						  
 		 
 end
