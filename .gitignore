@@ -1,1 +1,6 @@
-.DS_Store
+tiger.grm.*
+tiger.lex.*
+.cm
+*.swp
+*~
+*.zip

@@ -7,6 +7,7 @@ sig
   val name: frame -> Temp.label
   val formals: frame -> access list
   val allocLocal: frame -> bool -> access
+  val getStaticLink : frame -> access
   (* true if if the new variable escapes and needs to go in the frame. false -> can be allocated in register. *)
 
   val RV : Temp.temp (* as seen by callee*)
@@ -75,11 +76,9 @@ fun allocLocal FrameDict{name, formals, locals} esc =
 
 val FP = Temp.newtemp() (* frame pointer *)
 val wordSize = 8 (* ? *)
-fun exp access (T.TEMP(fp)) =
+fun exp access exp =
   (* used to turn a Frame.access into Tree.exp*)
   case access of
-      InFrame(k) => T.MEM(T.BINOP(T.PLUS, T.TEMP(FP), T.CONST(k))
+      InFrame(k) => T.MEM(T.BINOP(T.PLUS, exp, T.CONST(k))
     | InReg(tempReg) => T.TEMP(tempReg)
-						   
-    
 end
