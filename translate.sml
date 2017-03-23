@@ -81,6 +81,5 @@ fun transFun fundec : Tree.stm = (* build everything to a Tree.stm *)
   in
     ()
   end
-    
 		 
 end
