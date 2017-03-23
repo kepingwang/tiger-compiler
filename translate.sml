@@ -16,7 +16,7 @@ sig
   (* get the formals without the static link *)
   val allocLocal : level -> bool -> access
 
- 
+
   type exp
   val transNil: unit->exp
   val transInt: int->exp
@@ -31,17 +31,20 @@ end
 structure Translate : TRANSLATE =
 struct
 structure Frame : FRAME = MipsFrame
-datatype level = LEVEL of {parent: level, frame: Frame.frame, uniq: unit ref} (* ? *)
+datatype level = LEVEL of {parent: level, frame: Frame.frame, uniq: unit ref}
+               | OUTERMOST of {frame: Frame.frame}(* ? *)
 (* level needs to be kept track of *)
 type access = level * Frame.access
 type frag = Frame.frag
 (* Frame shouldn't know anything about static links, it is the responsibility of Translate. *)
 fun getFrame (LEVEL {frame, ...}) = frame
 fun parentLevel (LEVEL {parent, ...}) = parent
-fun newLevel {parent, name, formals} = {parent=parent,
-                                        frame=Frame.newFrame {name=name, formals=formals},
-                                       uniq=ref ()}
-(* pass static link as an extra element *)
+fun newLevel {parent, name, formals} =
+  (* pass static link as an extra element *)
+  {parent=parent,
+   frame=Frame.newFrame {name=name, formals=true::formals},
+   uniq=ref ()}
+val outermost = OUTERMOST {frame=Frame.newFrame  {name = Temp.newlabel(), formals = [true] } } 
 fun levelName level = Frame.name (getFrame level)
 structure A = Absyn
 structure T = Tree
@@ -50,15 +53,61 @@ datatype exp = Ex of Tree.exp
 	         | Nx of Tree.stm
 	         | Cx of Temp.label * Temp.label -> Tree.stm
 
+fun seq [s1, s2] = Tree.SEQ (s1, s2)
+  | seq (head :: tail) = Tree.SEQ(head, seq tail)
+fun unEx (Ex e) = e
+  | unEx (Nx s) = T.ESEQ(s, T.CONST 0)
+  | unEx (Cx c) =
+    let
+        val result = Temp.newtemp ()
+        val t_label = Temp.newlabel ()
+        val f_label = Temp.newlabel ()
+    in
+        T.ESEQ(seq [
+                    T.MOVE (T.TEMP result, T.CONST 1),
+                    c (t_label, f_label),
+                    T.LABEL f_label,
+                    T.MOVE(T.TEMP result, T.CONST 0),
+                    T.LABEL t_label
+                ],
+               T.TEMP result)
+    end
+
+fun unNx (Ex e) = T.EXP e
+  | unNx (Nx s) = s
+  | unNx (Cx c) =
+    let
+        val label = Temp.newlabel ()
+    in
+        seq [
+            c (label, label),
+            T.LABEL label
+        ]
+    end
+
+(*Nx case will never occur.
+ *We can improve the following by consider unCx(CONST 0/1)
+ *)
+fun unCx (Ex e) = (fn (t_label, f_label) => T.CJUMP (T.NE, e, T.CONST 0, t_label, f_label))
+  | unCx (Nx s) = (fn (t_label, f_label) => seq [s, T.JUMP (T.NAME f_label, [f_label])])
+  | unCx (Cx c) = c
+
 val fragList : frag list ref = ref []
 fun getResult () = !fragList
+fun getStaticLink level =
+  let
+      val static_link::_ = Frame.formals (getFrame level)
+  in
+      static_link
+  end
 fun traceStaticLink (dec_level, curr_level, exp) =
   (*return the address of FP of dec_level*)
   if dec_level = curr_level
   then exp
   else traceStaticLink (dec_level, parentLevel curr_level,
-                        Frame.exp (Frame.getStaticLink (getFrame curr_level)) exp) (*TREE.MEM (...) *)
+                        Frame.exp (getStaticLink curr_level) exp) (*TREE.MEM (...) *)
 
+fun formals (LEVEL {frame={formals, ...}, ...}) = formals
 fun simpleVar ( (dec_level, access), use_level) = Ex (Frame.exp access (
                                                            traceStaticLink (dec_level, use_level, T.TEMP Frame.FP)
                                                        )
@@ -79,14 +128,9 @@ fun transCall (call_level, dec_level, exp_list) =
       val func_label = levelName dec_level
       val arg_list = map unEx exp_list
   in
-      Ex (Tree.CALL (Tree.NAME func_label, traceStaticLink(parentLevel dec_level, curr_level, T.TEMP Frame.FP) :: arg_list))
+      Ex (Tree.CALL (Tree.NAME func_label, traceStaticLink(parentLevel dec_level, call_level, T.TEMP Frame.FP) :: arg_list))
   end
 
-fun addToSeq (exp1, exp2) =
-  Nx (Tree.SEQ (unNx exp1, unNx exp2))
-
-fun seq [s1, s2] = Tree.SEQ (s1, s2)
-  | seq head :: tail = Tree.SEQ(head, seq tail)
 
 fun transAssign (left_exp, right_exp) = Nx (Tree.MOVE (unEx left_exp, unEx right_exp) )
 
@@ -95,42 +139,19 @@ fun transRecord field_exps =
       val n = List.length field_exps
       val r = Temp.newtemp()
       val (init_seq, _) = foldl (fn (exp, (s_list, offset)) => (
-                                    unNx (transAssign ((Ex Tree.MEM
+                                    unNx (transAssign ((Ex (Tree.MEM
                                                            (T.BINOP
-                                                                (T.PLUS, T.TEMP r, CONST (offset * Frame.wordSize)
+                                                                (T.PLUS, T.TEMP r, T.CONST (offset * Frame.wordSize)
                                                                 )
-                                                           )
+                                                           ))
                                                        ),
-                                                       unEx exp
+                                                       exp
                                                       )
                                          ) :: s_list, offset + 1
                                 )) ([], 0) field_exps
-      val all_seq = Tree.MOVE (Tree.TEMP r, Tree.CALL (Tree.NAME (Temp.namedlabel "malloc"), CONST (n * Frame.wordSize))) :: init_seq
+      val all_seq = Tree.MOVE (T.TEMP r, Frame.externalCall ("malloc", [T.CONST (n * Frame.wordSize)])) :: init_seq
   in
-      Tree.ESEQ (seq all_seq, Tree.TEMP r)
+      Tree.ESEQ (seq all_seq, T.TEMP r)
   end
 
-fun transFun fundec : Tree.stm = (* build everything to a Tree.stm *)
-  let
-      (* Prologue *)
-      (* 1. assembly specific pseudo-instructions, announcing function begin *)
-      (* 2. label for function name *)
-      (* 3. an instruction to adjust the stack pointer (to allocate a new frame) *)
-      (* 4. instructions to save "escaping" args into the frame *)
-      (*   and to move non-escaping args into fresh temp registers. *)
-      (* 5. store instructions to save any callee-save registers -
-       including the return address register - used within the function. *)
-      (* Body *)
-      (* 6. the function body. Ex *)
-      val body = Ex(#body fundec)
-      (* Epilogue *)
-      (* 7. an instruction to move the return value to the register reserved *)
-      val out = T.MOVE(Frame.RV, body)
-                      (* 8. load instructions to restore the callee-save registers *)
-                      (* 9. instruction to reset the stack pointer *)
-                      (* 10. a return instruction (JUMP to the return address) *)
-                      (* 11. pseudo-instructions, as needed, to announce function end *)
-  in
-      ()
-  end
 end

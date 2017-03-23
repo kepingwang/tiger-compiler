@@ -9,7 +9,6 @@ sig
   val name: frame -> Temp.label
   val formals: frame -> access list
   val allocLocal: frame -> bool -> access
-  val getStaticLink: frame -> access
   (* true if if the new variable escapes and needs to go in the frame. false -> can be allocated in register. *)
 
   val RV : Temp.temp (* as seen by callee*)
@@ -18,6 +17,7 @@ sig
   val FP : Temp.temp (* frame pointer *)
   val wordSize : int
   val exp : access -> Tree.exp -> Tree.exp
+  val externalCall: string * Tree.exp list -> Tree.exp
   (* more...  *)
 end
 
@@ -58,11 +58,10 @@ fun allocLocalImpl stack_local_count true =
   end
   | allocLocalImpl _ false = InReg (Temp.newtemp())
 
-fun getStaticLink frame = InFrame(0)
 fun newFrame {name, formals = formals_esc} =
   (* formals: true for each escape parameter *)
   let
-      val stack_local_count = ref 1 (*1 reserved for static link*)
+      val stack_local_count = ref 0
       fun alloc_formals (reg_avail, esc::esc_tail) =
         if esc orelse reg_avail = 0
         then (allocLocalImpl stack_local_count esc) :: alloc_formals (reg_avail, esc_tail)
@@ -81,6 +80,6 @@ fun formals  {name, formals, stack_local_count} = formals
 
 fun allocLocal {name, formals, stack_local_count} esc = allocLocalImpl stack_local_count esc
 
-
+fun externalCall (name, param_list) = Tree.CALL(Tree.NAME(Temp.namedlabel(name)), param_list)
 end
 
