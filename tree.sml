@@ -30,7 +30,7 @@ end
 
 structure Tree : TREE = 
 struct
-  type label=Temp.label
+  type label = Temp.label
   type size = int
 
 datatype stm = SEQ of stm * stm
@@ -46,13 +46,15 @@ datatype stm = SEQ of stm * stm
              | ESEQ of stm * exp
              | NAME of label
              | CONST of int
-	     | CALL of exp * exp list
+	         | CALL of exp * exp list
 
-      and binop = PLUS | MINUS | MUL | DIV 
-                | AND | OR | LSHIFT | RSHIFT | ARSHIFT | XOR
+     and binop = PLUS | MINUS | MUL | DIV
+                 | AND | OR | LSHIFT | RSHIFT | ARSHIFT | XOR
 
-      and relop = EQ | NE | LT | GT | LE | GE 
-	        | ULT | ULE | UGT | UGE
+     and relop = EQ | NE | LT | GT | LE | GE
+	             | ULT | ULE | UGT | UGE
+fun notRel oper = oper
+fun commute oper = oper
 
 end
 

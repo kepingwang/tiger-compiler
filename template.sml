@@ -7,5 +7,5 @@ let val program =  "$1"
 in
     PrintAbsyn.print (TextIO.stdOut , tree);
     map printFrag frag_list;
-    if !ErrorMsg.anyErrors then print \"ERROR FOUND\\n\" else \(\)
+    if !ErrorMsg.anyErrors then print "ERROR FOUND\n" else ()
 end

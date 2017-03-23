@@ -10,8 +10,13 @@ parse.sml
 tiger.lex
 tiger.grm
 types.sml
+temp.sml
+temp.sig
 env.sig
 env.sml
+tree.sml
+frame.sml
+translate.sml
 semant.sml
 $/smlnj-lib.cm
 $/ml-yacc-lib.cm

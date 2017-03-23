@@ -426,7 +426,7 @@ and transDec (venv,tenv,A.FunctionDec(fundecs)) : {venv:venv,tenv:tenv} =
       (* IR: FunEntry now becomes {level: Trans.level, label: Temp.label, ...} *)
       val escList = TODO
       val label = Temp.newlabel()
-      val level = Trans.newLevel {parent=level, name=label, formals: escList}
+      val level = Trans.newLevel {parent=level, name=label, formals=escList}
       (* label is used for generating newLevel, and also stored in FunEntry *)
       fun addFunDec ({name=func_name, params, result, body, pos}, venv) =
           let

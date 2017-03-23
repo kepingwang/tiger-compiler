@@ -13,7 +13,7 @@ struct
 
     fun makestring t = "t" ^ Int.toString t
 
-  type label = Symbol.symbol
+    type label = Symbol.symbol
 
 local structure F = Format
       fun postinc x = let val i = !x in x := i+1; i end

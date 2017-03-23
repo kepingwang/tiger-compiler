@@ -11,6 +11,7 @@ echo testing $file
 if test -z $2; then
     cat $file
     echo -----------------------------------------------
+    sed "s:\$1:$file:g" template.sml
     sed "s:\$1:$file:g" template.sml | sml | python3 outfilter.py
     ret=$?
 else
