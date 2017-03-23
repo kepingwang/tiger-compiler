@@ -16,7 +16,7 @@ type expty = {exp: Trans.exp, ty: T.ty}
 
 (* IR: transDec and transExp will all require an extra parameter of current level *)
 (* {venv, tenv} becomes {venv, tenv, level} *)
-(* IR: FindEscape *)
+(* IR: TODO FindEscape *)
 
 val loop_nest_level = ref 0
 
@@ -148,119 +148,149 @@ fun findSuperType a b = if isSubTypeOf a b
                             else T.BOTTOM
 
 (* IR *)
-fun transExp (venv:venv, tenv:tenv, Trans.level:level) =
+fun transExp (venv:venv, tenv:tenv, level:Trans.level) =
   let
-      fun trexp (A.VarExp(var)) = trvar var
-        | trexp (A.NilExp) = {exp=(),ty=T.NIL}
-        | trexp (A.IntExp(num)) = {exp=(),ty=T.INT}
-        | trexp (A.StringExp(str,pos)) = {exp=(),ty=T.STRING}
-        | trexp (A.CallExp{func=func_name,args,pos}) =
-          let
-              (*check if types of args match formals*)
-              fun trcall ([], [], result) = {exp=(),ty=result}
-                | trcall (formal_head::formal_tail,arg_head::arg_tail, result) =
-                  let
-                      val {exp = arg_exp, ty = arg_ty} = trexp arg_head
-                      val {exp = tail_exp, ty = tail_ty} = trcall (formal_tail, arg_tail, result)
-                  in
-                      if isAssignable (actualTy formal_head) arg_ty
-                      then
-                          {exp=(), ty=result}
-                      else
-                          (err pos ("Function argument types do not match its declaration. Get: " ^ (T.toString arg_ty) ^ " Expected: " ^ (T.toString (actualTy formal_head)) );{exp=(), ty=result})
-                  end
-                | trcall ([], _, result) = (err pos "Too many arguments."; {exp=(), ty=result})
-                | trcall (_, [], result) = (err pos "Too few arguments."; {exp=(), ty=result})
-          in
-	          case S.look(venv,func_name) of
-	              SOME(E.FunEntry{formals,result}) => trcall(formals, args, result)
-	            | _ => (err pos ("function "^S.name func_name^" not defined"); {exp=(),ty=T.BOTTOM})
-          end
-        | trexp (A.OpExp{left,oper,right,pos}) = troper(left,oper,right,pos)
-        | trexp (A.RecordExp{fields = field_inst_list, typ = rec_name, pos}) =
-          let
-              val rec_ty = lookT (tenv, rec_name, pos)
-              (* A record instantiation must define the value of all the fields
-                 and in the same order as in the definition of the record type. *)
-              fun tr_record_inst ([], []) = ()
-                | tr_record_inst ((dec_fname,dec_ty)::dec_tail, (inst_fname, inst_exp, pos)::inst_dec)  =
-                  let
-                      val {exp, ty} = trexp inst_exp
-                  in
-                      if (S.name dec_fname) = (S.name inst_fname)
-                      then if  isAssignable (actualTy dec_ty) (actualTy ty)
-                           then ()
-                           else (err pos "Field instantiation expression has a wrong type.")
-                      else (err pos ("Incorrect field name:" ^ S.name inst_fname);())
-                  end
-                | tr_record_inst ([], _) = err pos "Too many fields."
-                | tr_record_inst (_, []) = err pos "Too few fields."
-          in
-              case rec_ty of
-                  T.RECORD (field_dec_list, unq) => {exp=tr_record_inst (field_dec_list, field_inst_list), ty=rec_ty}
-                | _ => ({exp=(), ty=rec_ty})
-          end
-	    | trexp (A.SeqExp([])) =
-	      {exp=(),ty=T.UNIT}
-        | trexp (A.SeqExp([(exp,pos)])) =
-	      trexp exp
-        | trexp (A.SeqExp((exp,pos)::exp_tail)) =
+    fun trexp (A.VarExp(var)) = trvar var
+      | trexp (A.NilExp) = {exp=Trans.transNil(), ty=T.NIL}
+      | trexp (A.IntExp(num)) = {exp=Trans.transInt(num),ty=T.INT}
+      | trexp (A.StringExp(str,pos)) = {exp=Trans.transString(str),ty=T.STRING}
+      | trexp (A.CallExp{func=func_name,args,pos}) =
+        let
+	  (* trargs(formals: T.ty list, args: A.exp list) : Tree.exp list *)
+	  (* type check arguments and return Tree.exp list of arguments *)
+	  fun trargs ([], []) : Tree.exp list = []
+	    | trargs (formal_head::formal_tail, arg_head::arg_tail) =
 	      let
-              val {exp=head_exp, ty=head_ty} = trexp exp
-	          val {exp=rest_exp, ty=rest_ty} = trexp (A.SeqExp exp_tail)
+		val {exp=arg_exp, ty=arg_ty} =
+		    if (isAssignable (actualTy formal_head) arg_head)
+		    then trexp arg_head
+		    else (err pos ("Function argument types do not match its declaration. Get: " ^ (T.toString arg_ty) ^ " Expected: " ^ (T.toString (actualTy formal_head)) );
+			  {exp=Trans.transNil(), ty=T.BOTTOM})
+		val tailExpList = trargs(formal_tail, arg_tail)
 	      in
-              {exp=(), ty=rest_ty}
+		arg_exp::tailExpList
 	      end
-        | trexp (A.AssignExp{var,exp,pos}) =
-	      let
-	          val {exp=left_exp,ty=left_ty} = trvar var
-	          val {exp=right_exp,ty=right_ty} = trexp exp
-	      in
-              case left_ty of
-                  T.INT => (err pos "Cannot assign to loop variable"; {exp=(), ty=T.UNIT})
-                | _ => (
-	                  if isAssignable left_ty right_ty
-	                  then {exp=(),ty=T.UNIT}
-	                  else (err pos ("The types of operand for operator assignment do not match. left: " ^ (T.toString left_ty) ^" right: " ^ (T.toString right_ty)); {exp=(),ty=T.UNIT})
-                  )
-	      end
-        | trexp (A.IfExp{test,then',else'=SOME(else'),pos}) =
-	      (* Note!!!:
+	    | trargs ([], _) = (err pos "Too many arguments."; [])
+	    | trargs ([], _) = (err pos "Too few arguments."; [])
+        in
+	  case S.look(venv,func_name) of
+	      SOME(E.FunEntry{level=flevel,label=flabel,formals,result}) => (
+	     { exp=Trans.transCall(level,flevel,trargs(formals, args)),
+	       ty=result
+	     }
+	   )
+	    | _ => ( err pos ("function "^S.name func_name^" not defined");
+		     {exp=Trans.transNil(),ty=T.BOTTOM}
+		   )
+        end
+      | trexp (A.OpExp{left,oper,right,pos}) = troper(left,oper,right,pos)
+      | trexp (A.RecordExp{fields = field_inst_list, typ = rec_name, pos}) =
+        let
+          val rec_ty = lookT (tenv, rec_name, pos)
+          (* A record instantiation must define the value of all the fields
+             and in the same order as in the definition of the record type. *)
+	  (* tr_record_inst(decList, instList) returns an inst list of Trans.exp *)
+          fun tr_record_inst ([], []) = []
+            | tr_record_inst ((dec_fname,dec_ty)::dec_tail, (inst_fname, inst_exp, pos)::inst_tail)  =
+              let
+                val {exp, ty} = trexp inst_exp
+		val instTailExpList = tr_record_inst (dec_tail, inst_tail)
+		val check =
+		    if (S.name dec_fname) = (S.name inst_fname)
+		    then if  isAssignable (actualTy dec_ty) (actualTy ty)
+			 then ()
+			 else (err pos "Field instantiation expression has a wrong type."; ())
+		    else (err pos ("Incorrect field name:" ^ S.name inst_fname); ())
+              in
+		exp::instTailExpList
+              end
+            | tr_record_inst ([], _) = (err pos "Too many fields."; [])
+            | tr_record_inst (_, []) = (err pos "Too few fields."; [])
+        in
+          case rec_ty of
+              T.RECORD (field_dec_list, unq) => (
+	     {
+	       exp=Trans.transRecord(
+		 tr_record_inst (field_dec_list, field_inst_list)
+	       ),
+	       ty=rec_ty
+	     }
+	   )
+            | _ => ({exp=Trans.transNil(), ty=rec_ty})
+        end
+      | trexp (A.SeqExp([])) =
+	{exp=Trans.transNil(),ty=T.UNIT}
+      | trexp (A.SeqExp([(exp,pos)])) =
+	trexp exp
+      | trexp (A.SeqExp((exp,pos)::exp_tail)) =
+	let
+          val {exp=head_exp, ty=head_ty} = trexp exp
+	  val {exp=rest_exp, ty=rest_ty} = trexp (A.SeqExp exp_tail)
+	in
+          {exp=Trans.addToSeq(head_exp, tail_exp), ty=rest_ty}
+	end
+      | trexp (A.AssignExp{var,exp,pos}) =
+	let
+	  val {exp=left_exp,ty=left_ty} = trvar var
+	  val {exp=right_exp,ty=right_ty} = trexp exp
+	in
+          case left_ty of
+              T.INT => (
+	     err pos "Cannot assign to loop variable";
+	     {exp=Trans.transNil(), ty=T.UNIT}
+	   )
+            | _ => (
+	      if isAssignable left_ty right_ty
+	      then {exp=Trans.transAssign(left_exp, right_exp),ty=T.UNIT}
+	      else (err pos ("The types of operand for operator assignment do not match. left: " ^ (T.toString left_ty) ^" right: " ^ (T.toString right_ty)); {exp=Trans.transNil(),ty=T.UNIT})
+            )
+	end
+      | trexp (A.IfExp{test,then',else'=SOME(else'),pos}) =
+	(* Note!!!:
 	 if-then-else return the type of exp2 and exp3
 	 if-then must return void *)
-	      let
-              val {exp=test_exp, ty=test_ty} = trexp test
-	          val {exp=if_exp,ty=then_ty} = trexp then'
-	          val {exp=else_exp,ty=else_ty} = trexp else'
-	      in
-              checkInt(test_ty, pos);
-              if (isCompatible then_ty else_ty)
-	          then {exp=(),ty=findSuperType then_ty else_ty}
-	          else (err pos "Types of then branch and else branch do not match."; {exp=(),ty=T.BOTTOM})
-	      end
-        | trexp (A.IfExp{test,then',else'=NONE,pos}) =
+	let
+          val {exp=test_exp, ty=test_ty} = trexp test
+	  val {exp=then_exp,ty=then_ty} = trexp then'
+	  val {exp=else_exp,ty=else_ty} = trexp else'
+	in
+          checkInt(test_ty, pos);
+          if (isCompatible then_ty else_ty)
+	  then {
+	    exp=Trans.transIf(test_exp, then_exp, else_exp),
+	    ty=findSuperType then_ty else_ty
+	  }
+	  else (
+	    err pos "Types of then branch and else branch do not match.";
+	    {exp=Trans.Nil(),ty=T.BOTTOM}
+	  )
+	end
+      | trexp (A.IfExp{test,then',else'=NONE,pos}) =
+        let
+          val {exp=test_exp, ty=test_ty} = trexp test
+	  val {exp=then_exp,ty=then_ty} = trexp then'
+        in
+          checkInt(test_ty, pos);
+          checkUnit(then_ty, pos);
+	  {
+	    exp=Trans.transIf(test_exp, then_exp, Trans.transNil()),
+	    ty=T.UNIT
+	  }
+        end
+      | trexp (A.WhileExp{test,body,pos}) =
+        let
+          val {exp=test_exp, ty=test_ty} = trexp test
+        in
+          loop_nest_level := !loop_nest_level + 1;
           let
-              val {exp=test_exp, ty=test_ty} = trexp test
-	          val {exp=if_exp,ty=then_ty} = trexp then'
+	    val {exp=body_exp,ty=body_ty} = trexp body
           in
-              checkInt(test_ty, pos);
-              checkUnit(then_ty, pos);
-	          {exp=(),ty=T.UNIT}
+            loop_nest_level := !loop_nest_level - 1;
+	    checkInt(test_ty, pos);
+	    checkUnit(body_ty, pos);
+	    {exp=(),ty=T.UNIT}
           end
-        | trexp (A.WhileExp{test,body,pos}) =
-          let
-              val {exp=test_exp, ty=test_ty} = trexp test
-          in
-              loop_nest_level := !loop_nest_level + 1;
-              let
-	              val {exp=body_exp,ty=body_ty} = trexp body
-              in
-                  loop_nest_level := !loop_nest_level - 1;
-	              checkInt(test_ty, pos);
-	              checkUnit(body_ty, pos);
-	              {exp=(),ty=T.UNIT}
-              end
-          end
+        end
         | trexp (A.ForExp{var=id,escape,lo,hi,body,pos}) =
 	      (* for id := exp1 to exp2 do exp3 *)
 	      (* id is a variable implicitly declared by for statement, *)
@@ -504,12 +534,13 @@ and transTy (tenv, A.NameTy(tid,pos)) =
         | NONE => (err pos ("cannot find array type"^S.name tid); T.BOTTOM)
     )
 
-fun transProg (exp:A.exp) : Tree.exp =
+fun transProg (exp:A.exp) : Trans.frag list =
   let
     (* IR *)
+    (* TODO outermost should contain system functions *)
     val expty = transExp(E.base_venv, E.base_tenv, Trans.outermost) exp
   in
-    ()
+    Trans.getResult()
   end
 
 
