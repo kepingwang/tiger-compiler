@@ -15,12 +15,14 @@ sig
   val formals : level -> access list
   (* get the formals without the static link *)
   val allocLocal : level -> bool -> access
-				      
+
+						      
+  val transNil: unit->exp
+  val transInt: int->exp
+  val transString: string->exp 
+
 
   type exp
-  val unEx : exp -> Tree.exp
-  val unNx : exp -> Tree.stm
-  val unCx : exp -> (Temp.label * Temp.label) -> Tree.stm
   val simpleVar : (access * level) -> exp
   val procEntryExit : {level: level, body: exp} -> unit
 						     
@@ -58,6 +60,10 @@ fun simpleVar (access, level) =
   (* this access is first generated from Translate.allocLocal *)
   Frame.exp access (getLevelFP level)
 		     
+fun transNil() = Ex (Tree.CONST 0)
+
+fun transInt number = Ex (Tree.CONST number)
+
 fun transFun fundec : Tree.stm = (* build everything to a Tree.stm *)
   let
   (* Prologue *)
