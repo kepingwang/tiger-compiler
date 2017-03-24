@@ -334,7 +334,7 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level, break_dest:Trans.exp) =
                     val {venv=venv',tenv=tenv',level=level',break_dest=break_dest',init_exp=init_exp} =
                         transDec(venv,tenv,level,break_dest,dec)
                 in
-                    {venv=venv',tenv=tenv',level=level',break_dest=break_dest',init_list=init_exp::init_list}
+                    {venv=venv',tenv=tenv',level=level',break_dest=break_dest',init_list=init_list @ init_exp}
                 end
               val {venv=venv',tenv=tenv',level=level',break_dest=break_dest',init_list=init_list} = (
                   foldl combineEnv
@@ -446,7 +446,7 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level, break_dest:Trans.exp) =
 (* val {venv=venv',tenv=tenv',level=level',break_dest=break_dest',init_exp=init_exp} = *)
 (* transDec(venv,tenv,level,break_dest,dec) *)
 and transDec (venv,tenv,level,break_dest,A.FunctionDec(fundecs)) :
-    {venv:venv,tenv:tenv,level:Trans.level,break_dest:Trans.exp,init_exp:Trans.exp} =
+    {venv:venv,tenv:tenv,level:Trans.level,break_dest:Trans.exp,init_exp:Trans.exp list} =
     let
         fun addFunDec ({name=func_name, params, result, body, pos}, venv) =
           let
@@ -487,12 +487,14 @@ and transDec (venv,tenv,level,break_dest,A.FunctionDec(fundecs)) :
         if  dup_bool then err dup_pos "Duplicated names in a sequence of function declarations."
         else ();
         map transFunBody fundecs;
-        {venv=venv',tenv=tenv,level=level,break_dest=break_dest, init_exp=Trans.nil()}
+        {venv=venv',tenv=tenv,level=level,break_dest=break_dest, init_exp=[]}
     end
   | transDec (venv,tenv,level,break_dest,A.VarDec{name,escape,typ=type_option,init,pos}) =
     let
         val {exp=init_exp,ty=init_ty} = transExp (venv,tenv,level,break_dest) init
         val access = Trans.allocLocal level (!escape)
+        val val_exp = Trans.simpleVar (access, level)
+        val init_assign_exp = Trans.assign (val_exp, init_exp)
         val venv' =
             case type_option of
                 SOME(type_name, pos) =>
@@ -512,7 +514,7 @@ and transDec (venv,tenv,level,break_dest,A.FunctionDec(fundecs)) :
                     | _ => S.enter (venv, name, E.VarEntry {access=access, ty=init_ty})
               )
     in
-        {venv=venv',tenv=tenv,level=level,break_dest=break_dest, init_exp=init_exp}
+        {venv=venv',tenv=tenv,level=level,break_dest=break_dest, init_exp=[init_assign_exp] }
     end
   | transDec (venv,tenv,level,break_dest,A.TypeDec(decList)) =
     (* Using foldl recursively add each symbol name into our environment, next we will give each an 'actual type'*)
@@ -537,7 +539,7 @@ and transDec (venv,tenv,level,break_dest,A.FunctionDec(fundecs)) :
             if cycle_found then reset_types typ_list
             else ()
         end;
-        {venv=venv, tenv=tenv', level=level, break_dest=break_dest, init_exp=Trans.nil()}
+        {venv=venv, tenv=tenv', level=level, break_dest=break_dest, init_exp=[]}
     end
 (* we take in an A.NameType and return the true T.Type, unless we can't find it*)
 and transTy (tenv, A.NameTy(tid,pos)) =

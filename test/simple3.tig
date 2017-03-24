@@ -1,0 +1,6 @@
+let
+    var x := 1
+    var y := 2
+in
+    if x > y then 10 else 20
+end

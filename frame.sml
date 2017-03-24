@@ -41,7 +41,7 @@ datatype frag = PROC of {body: Tree.stm, frame: frame}
 		      | STRING of Temp.label * string
 val FP = Temp.newtemp() (* frame pointer *)
 val RV = Temp.newtemp() (* return value reg*)
-val wordSize = 8 (* ? *)
+val wordSize = 4 (* ? *)
 fun exp access exp =
   (* used to turn a Frame.access into Tree.exp, exp param is the address of the FP*)
   case access of

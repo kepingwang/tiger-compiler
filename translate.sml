@@ -72,7 +72,8 @@ datatype exp = Ex of Tree.exp
 	         | Nx of Tree.stm
 	         | Cx of Temp.label * Temp.label -> Tree.stm
 
-fun seq [] = Tree.SEQ (Tree.LABEL (Temp.newlabel() ), Tree.LABEL (Temp.newlabel()))
+fun seq [] = Tree.LABEL (Temp.newlabel() )
+  | seq [s1] = s1
   | seq [s1, s2] = Tree.SEQ (s1, s2)
   | seq (head :: tail) = Tree.SEQ(head, seq tail)
 fun unEx (Ex e) = e

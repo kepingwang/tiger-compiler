@@ -1,0 +1,6 @@
+let
+    var x := 1
+    function f ( y:int):int = y + x
+in
+    f (x)
+end
