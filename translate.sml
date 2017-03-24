@@ -20,6 +20,11 @@ sig
   val transNil: unit->exp
   val transInt: int->exp
   val transString: string->exp
+  val transIfThen: exp * exp -> exp
+  val transIfThenElse: exp * exp * exp -> exp
+  val transNewBreakDest: unit -> exp
+  val transWhile: exp * exp * exp -> exp
+  val transFor: exp * exp * exp * exp * exp -> exp
   val simpleVar : (access * level) -> exp
   val procEntryExit : {level: level, body: exp} -> unit
   structure Frame : FRAME
@@ -178,5 +183,84 @@ fun procEntryExit {level, body} =
       val fixed_body = Frame.procEntryExit1 (frame, unNx body)
   in
       fragList := Frame.PROC {body=fixed_body, frame = frame} :: !fragList
+  end
+
+fun transIfThen (test, exp1) =
+  let
+      val tlb = Temp.newlabel()
+      val flb =Temp.newlabel()
+      val jump_stmt = (unCx test) (tlb, flb)
+      val body_stmt = unNx exp1
+  in
+      Nx (seq [
+          jump_stmt,
+          T.LABEL tlb,
+          body_stmt,
+          T.LABEL flb
+      ])
+  end
+fun transIfThenElse (test, exp1, exp2) =
+    let
+        val tlb = Temp.newlabel ()
+        val flb =Temp.newlabel ()
+        val join_lb =Temp.newlabel ()
+        val result = Temp.newtemp ()
+        val jump_stmt = (unCx test) (tlb, flb)
+        val t_branch_exp = unEx exp1
+        val f_branch_exp = unEx exp2
+    in
+        Ex (T.ESEQ (seq [
+                         jump_stmt,
+                         T.LABEL tlb,
+                         T.MOVE (T.TEMP result ,t_branch_exp),
+                         T.JUMP (T.NAME join_lb, [join_lb]),
+                         T.LABEL flb,
+                         T.MOVE (T.TEMP result ,f_branch_exp),
+                         T.LABEL join_lb
+                     ],
+                    T.TEMP result
+                   )
+           )
+    end
+
+fun transNewBreakDest () =  Nx (T.LABEL (Temp.newlabel () ))
+fun transWhile (test, body, done_lb) =
+  let
+      val (T.LABEL done_lb) = unNx done_lb
+      val start_lb = Temp.newlabel ()
+      val cont_lb = Temp.newlabel ()
+      val jump_stmt = (unCx test) (cont_lb, done_lb)
+      val body_stmt = unNx body
+  in
+      Nx (seq [
+               T.LABEL start_lb,
+               jump_stmt,
+               body_stmt,
+               T.JUMP (T.NAME start_lb, [start_lb]),
+               T.LABEL done_lb
+           ]
+         )
+  end
+fun transFor (i_exp, lo, hi, body, done_lb) =
+  let
+      val (T.LABEL done_lb) = unNx done_lb
+      val limit = Temp.newtemp()
+      val i_exp = unEx i_exp
+      val start_lb = Temp.newlabel ()
+      val cont_lb = Temp.newlabel ()
+      val jump_stmt = T.CJUMP (T.LE, i_exp, T.TEMP limit , cont_lb, done_lb)
+      val inc_stmt = T.MOVE(i_exp, T.BINOP (T.PLUS, i_exp, T.CONST 1))
+      val body_stmt = unNx body
+  in
+      Nx (seq [
+               T.MOVE (i_exp, unEx lo),
+               T.MOVE (T.TEMP limit, unEx hi),
+               T.LABEL start_lb,
+               jump_stmt,
+               body_stmt,
+               inc_stmt,
+               T.JUMP (T.NAME start_lb, [start_lb]),
+               T.LABEL done_lb
+         ])
   end
 end
