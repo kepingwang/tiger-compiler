@@ -51,7 +51,7 @@ fun procEntryExit1 (frame , body) = body
 
 fun allocLocalImpl stack_local_count true =
   let
-      val newLocal = InFrame (!stack_local_count * wordSize)
+      val newLocal = InFrame (~(!stack_local_count * wordSize))
   in
       stack_local_count := !stack_local_count + 1;
       newLocal

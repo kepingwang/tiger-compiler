@@ -1,0 +1,6 @@
+let
+    type arrtype = array of int
+    var x := arrtype [10] of 0
+in
+    x[11]
+end 

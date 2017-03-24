@@ -216,7 +216,31 @@ fun array (size_exp, init_exp) =
       Frame.externalCall ("initArray", [unEx size_exp, unEx init_exp])
   )
 
-fun arraySubscript (var_exp, index_exp) = Ex (T.MEM (T.BINOP (T.PLUS, unEx var_exp, unEx index_exp)))
+fun arraySubscript (var_exp, index_exp) =
+  let
+      val var_addr_reg = Temp.newtemp()
+      val index_reg = Temp.newtemp()
+      val assign_addr_stmt = T.MOVE(T.TEMP var_addr_reg, unEx var_exp)
+      val assign_index_stmt = T.MOVE(T.TEMP index_reg, unEx index_exp)
+      val get_size_exp = T.MEM(T.BINOP(T.MINUS, T.TEMP var_addr_reg, T.CONST 1))
+      val valid_lb = Temp.newlabel()
+      val invalid_lb = Temp.newlabel()
+      val check_stmt = T.CJUMP (T.LT, T.TEMP index_reg, get_size_exp, valid_lb, invalid_lb)
+      val exit_stmt = T.EXP (Frame.externalCall ("exit", [T.CONST 1]))
+      val get_exp = T.MEM (T.BINOP (T.PLUS, T.TEMP var_addr_reg, T.TEMP index_reg))
+  in
+      Ex (T.ESEQ (
+      seq[
+          assign_addr_stmt,
+          assign_index_stmt,
+          check_stmt,
+          T.LABEL invalid_lb,
+          exit_stmt,
+          T.LABEL valid_lb
+      ],
+      get_exp
+      ))
+  end
 
 structure A = Absyn
 
