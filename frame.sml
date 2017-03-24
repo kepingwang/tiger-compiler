@@ -62,12 +62,7 @@ fun newFrame {name, formals = formals_esc} =
   (* formals: true for each escape parameter *)
   let
       val stack_local_count = ref 0
-      fun alloc_formals (reg_avail, esc::esc_tail) =
-        if esc orelse reg_avail = 0
-        then (allocLocalImpl stack_local_count esc) :: alloc_formals (reg_avail, esc_tail)
-        else InReg (Temp.newtemp()) :: alloc_formals (reg_avail - 1, esc_tail)
-        | alloc_formals (_, []) = []
-      val formals_access = alloc_formals (4, formals_esc)
+      val formals_access = map (allocLocalImpl stack_local_count) formals_esc
   in
       {name=name,
 	   formals=formals_access,
