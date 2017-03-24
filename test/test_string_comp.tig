@@ -1,0 +1,6 @@
+let
+    var x := "hello"
+    var y := "world"
+in
+    x <> y
+end

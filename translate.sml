@@ -36,6 +36,7 @@ sig
   val forExp: exp * exp * exp * exp * exp -> exp
   val simpleVar : (access * level) -> exp
   val procEntryExit : {level: level, body: exp} -> unit
+  val stringRelop: Aexp * exp * exp -> exp
   val relop: Aexp * exp * exp -> exp
   val binop: Aexp * exp * exp -> exp
   val addToSeq: exp * exp -> exp
@@ -257,6 +258,11 @@ fun binop (A_oper, left_exp, right_exp) =
         | _ => Ex (T.CONST 0) (* shouldn't be called *)
   end
 
+fun stringRelop (Aoper, left_exp, right_exp) =
+  case Aoper of
+      A.EqOp => Ex (Frame.externalCall ("stringEqual", [unEx left_exp, unEx right_exp]))
+    | A.NeqOp => Ex (T.BINOP(T.MINUS, T.CONST 1, Frame.externalCall ("stringEqual", [unEx left_exp, unEx right_exp])))
+    | _ => Ex (T.CONST 0)
 fun relop (A_oper, left_exp, right_exp) =
   let
       val T_relop =

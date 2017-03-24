@@ -395,7 +395,11 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level, break_dest:Trans.exp) =
                )
                |  (A.EqOp | A.NeqOp ) => (
                    if isCompatible left_ty right_ty
-                   then {exp=Trans.relop(oper, left_exp, right_exp), ty=T.INT}
+                   then (
+                       case left_ty of
+                           T.STRING => {exp=Trans.stringRelop (oper, left_exp, right_exp), ty=T.INT}
+                         | _ => {exp=Trans.relop(oper, left_exp, right_exp), ty=T.INT}
+                   )
                    else (err pos ("Left and right types are not compatible, where left :" ^ (T.toString left_ty) ^ " right :" ^ (T.toString right_ty));
                          {exp=Trans.nil(), ty=T.INT})
                )
