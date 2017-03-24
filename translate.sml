@@ -177,6 +177,13 @@ fun transRecord field_exps =
       Tree.ESEQ (seq all_seq, T.TEMP r)
   end
 
+
+fun transWhile (test_exp, body_exp, break_dest) = ()
+
+fun transFor (i_access, lo_exp, hi_exp, body_exp, break_dest) = ()  
+
+fun transBreak (break_dest_exp) = ()
+
 fun procEntryExit {level, body} =
   let
       val frame = getFrame level

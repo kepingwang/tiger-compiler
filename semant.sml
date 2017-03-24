@@ -148,7 +148,7 @@ fun findSuperType a b = if isSubTypeOf a b
                             else T.BOTTOM
 
 (* IR *)
-fun transExp (venv:venv, tenv:tenv, level:Trans.level) =
+fun transExp (venv:venv, tenv:tenv, level:Trans.level, breakDest:Tree.exp) =
   let
     fun trexp (A.VarExp(var)) = trvar var
       | trexp (A.NilExp) = {exp=Trans.transNil(), ty=T.NIL}
@@ -174,7 +174,7 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level) =
 	    | trargs ([], _) = (err pos "Too few arguments."; [])
         in
 	  case S.look(venv,func_name) of
-	      SOME(E.FunEntry{level=flevel,label=flabel,formals,result}) => (
+	      SOME(E.FunEntry{level=flevel,formals,result}) => (
 	     { exp=Trans.transCall(level,flevel,trargs(formals, args)),
 	       ty=result
 	     }
@@ -280,59 +280,64 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level) =
       | trexp (A.WhileExp{test,body,pos}) =
         let
           val {exp=test_exp, ty=test_ty} = trexp test
+	  val break_dest_new = Trans.newBreakDest()
         in
           loop_nest_level := !loop_nest_level + 1;
           let
-	    val {exp=body_exp,ty=body_ty} = trexp body
+	    val {exp=body_exp,ty=body_ty} = transExp (venv,tenv,level,break_dest_new) body
           in
             loop_nest_level := !loop_nest_level - 1;
 	    checkInt(test_ty, pos);
 	    checkUnit(body_ty, pos);
-	    {exp=(),ty=T.UNIT}
+	    {exp=Trans.transWhile(test_exp, body_exp, break_dest),ty=T.UNIT}
           end
         end
-        | trexp (A.ForExp{var=id,escape,lo,hi,body,pos}) =
-	      (* for id := exp1 to exp2 do exp3 *)
-	      (* id is a variable implicitly declared by for statement, *)
-	      (* whose scope only covers exp3, but cannot be assigned to in exp3 *)
-	      (*     The start and end index must be of type *)
-	      (* int. The variable is of type int and must not be *)
-	      (* assigned to in the body. The body must be of type *)
-	      (* void. The result type is void. *) (* ??? how to do this ??? *)
+      | trexp (A.ForExp{var=id,escape,lo,hi,body,pos}) =
+	(* for id := exp1 to exp2 do exp3 *)
+	(* id is a variable implicitly declared by for statement, *)
+	(* whose scope only covers exp3, but cannot be assigned to in exp3 *)
+	(*     The start and end index must be of type *)
+	(* int. The variable is of type int and must not be *)
+	(* assigned to in the body. The body must be of type *)
+	(* void. The result type is void. *) (* ??? how to do this ??? *)
+        let
+          val {exp=lo_exp, ty=lo_ty} = trexp lo
+          val {exp=hi_exp, ty=hi_ty} = trexp hi
+	  val i_access = Trans.allocLocal level escape
+          val venv' = S.enter (venv, id, E.VarEntry {access=i_access, ty=T.INT})
+	  val break_dest_new = Trans.newBreakDest()
+        in
+          loop_nest_level := !loop_nest_level + 1;
           let
-              val {exp=lo_exp, ty=lo_ty} = trexp lo
-              val {exp=hi_exp, ty=hi_ty} = trexp hi
-              val venv' = S.enter (venv, id, E.VarEntry {ty=T.INT})
+            val {exp=body_exp, ty=body_ty} = transExp (venv',tenv,level,break_dest_new) body
           in
-              loop_nest_level := !loop_nest_level + 1;
-              let
-                  val {exp=body_exp, ty=body_ty} = transExp (venv', tenv) body
-              in
-                  loop_nest_level := !loop_nest_level - 1;
-                  checkInt(lo_ty, pos);
-                  checkInt(hi_ty, pos);
-                  checkUnit(body_ty, pos);
-                  {exp=(), ty=T.UNIT}
-              end
+            loop_nest_level := !loop_nest_level - 1;
+            checkInt(lo_ty, pos);
+            checkInt(hi_ty, pos);
+            checkUnit(body_ty, pos);
+            {exp=Trans.transFor(i_access, lo_exp, hi_exp, body_exp, break_dest), ty=T.UNIT}
           end
-        | trexp (A.BreakExp(pos)) = (if !loop_nest_level = 0
-                                     then err pos "Break can only be inside a loop."
-                                     else ();
-                                     {exp=(),ty=T.BOTTOM})
-        | trexp (A.LetExp{decs=[],body,pos}) =
-	      trexp body
-        | trexp (A.LetExp{decs=[dec],body,pos}) =
-	      let
-              val {venv=venv',tenv=tenv'} = transDec(venv,tenv,dec)
-	      in
-              transExp(venv',tenv') body
-	      end
-        | trexp (A.LetExp{decs=dec::decs,body,pos}) =
-	      let
-	          val {venv=venv',tenv=tenv'} = transDec(venv,tenv,dec)
-	      in
-	          transExp (venv',tenv') (A.LetExp{decs=decs,body=body,pos=pos})
-	      end
+        end
+      | trexp (A.BreakExp(pos)) = (
+	if !loop_nest_level = 0
+        then err pos "Break can only be inside a loop."
+        else ();
+        {exp=Trans.transBreak(break_dest), ty=T.BOTTOM}
+      )
+      | trexp (A.LetExp{decs=[],body,pos}) =
+	trexp body
+      | trexp (A.LetExp{decs=[dec],body,pos}) =
+	let
+          val {venv=venv',tenv=tenv'} = transDec(venv,tenv,dec)
+	in
+          transExp(venv',tenv') body
+	end
+      | trexp (A.LetExp{decs=dec::decs,body,pos}) =
+	let
+	  val {venv=venv',tenv=tenv'} = transDec(venv,tenv,dec)
+	in
+	  transExp (venv',tenv') (A.LetExp{decs=decs,body=body,pos=pos})
+	end
         | trexp (A.ArrayExp{typ,size,init, pos}) =
           (* The tyId must refer to an array type. *)
           (* The expression in square brackets must be int, and *)
@@ -423,11 +428,9 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level) =
   end
 and transDec (venv,tenv,A.FunctionDec(fundecs)) : {venv:venv,tenv:tenv} =
     let
-      (* IR: FunEntry now becomes {level: Trans.level, label: Temp.label, ...} *)
+      (* IR: FunEntry now becomes {level: Trans.level, ...} *)
       val escList = TODO
-      val label = Temp.newlabel()
-      val level = Trans.newLevel {parent=level, name=label, formals=escList}
-      (* label is used for generating newLevel, and also stored in FunEntry *)
+      val level = Trans.newLevel {parent=level, formals=escList}
       fun addFunDec ({name=func_name, params, result, body, pos}, venv) =
           let
               fun findParamType {name=var_name, escape, typ=type_name, pos} = lookT (tenv, type_name, pos)
