@@ -9,6 +9,7 @@ sig
     (* when calling Frame.newFrame, Translate passes static link as
      an extra escaped parameter. Frame.newFrame(label, true::formals) *)
     parent: level,
+    name: Temp.label,
     formals: bool list
   } -> level
   val formals : level -> access list
@@ -37,15 +38,13 @@ type access = level * Frame.access
 type frag = Frame.frag
 (* Frame shouldn't know anything about static links, it is the responsibility of Translate. *)
 fun getFrame (LEVEL {frame, ...}) = frame
-  | getFrame (OUTERMOST {frame, ...}) = frame
 fun parentLevel (LEVEL {parent, ...}) = parent
-  | parentLevel outerlevel = outerlevel
-fun newLevel {parent, formals} =
+fun newLevel {parent, name, formals} =
   (* pass static link as an extra element *)
-  LEVEL {parent=parent,
-         frame=Frame.newFrame {name=Temp.newlabel(), formals=true::formals},
-         uniq=ref ()}
-val outermost = OUTERMOST {frame=Frame.newFrame  {name = Temp.newlabel(), formals = [true] } }
+  {parent=parent,
+   frame=Frame.newFrame {name=name, formals=true::formals},
+   uniq=ref ()}
+val outermost = OUTERMOST {frame=Frame.newFrame  {name = Temp.newlabel(), formals = [true] } } 
 fun levelName level = Frame.name (getFrame level)
 structure A = Absyn
 structure T = Tree
@@ -54,8 +53,7 @@ datatype exp = Ex of Tree.exp
 	         | Nx of Tree.stm
 	         | Cx of Temp.label * Temp.label -> Tree.stm
 
-fun seq [] = Tree.SEQ (Tree.LABEL (Temp.newlabel() ), Tree.LABEL (Temp.newlabel()))
-  | seq [s1, s2] = Tree.SEQ (s1, s2)
+fun seq [s1, s2] = Tree.SEQ (s1, s2)
   | seq (head :: tail) = Tree.SEQ(head, seq tail)
 fun unEx (Ex e) = e
   | unEx (Nx s) = T.ESEQ(s, T.CONST 0)
@@ -109,28 +107,12 @@ fun traceStaticLink (dec_level, curr_level, exp) =
   else traceStaticLink (dec_level, parentLevel curr_level,
                         Frame.exp (getStaticLink curr_level) exp) (*TREE.MEM (...) *)
 
-fun formals level =
-  (case level of
-       LEVEL {frame={formals = formals, ...}, ...} =>
-       let
-           val _ :: user_formals = formals
-           val formals_access = map (fn x => (level, x)) user_formals
-       in
-           formals_access
-       end
-    | OUTERMOST _ => []
-  )
+fun formals (LEVEL {frame={formals, ...}, ...}) = formals
 fun simpleVar ( (dec_level, access), use_level) = Ex (Frame.exp access (
                                                            traceStaticLink (dec_level, use_level, T.TEMP Frame.FP)
                                                        )
                                                      )
 
-fun allocLocal level esc =
-  let
-      val frame = getFrame level
-  in
-      (level, Frame.allocLocal frame esc)
-  end
 fun transNil() = Ex (Tree.CONST 0)
 fun transInt number = Ex (Tree.CONST number)
 fun transString str =
@@ -172,19 +154,40 @@ fun transRecord field_exps =
       Tree.ESEQ (seq all_seq, T.TEMP r)
   end
 
-
 fun transWhile (test_exp, body_exp, break_dest) = ()
 
 fun transFor (i_access, lo_exp, hi_exp, body_exp, break_dest) = ()  
 
 fun transBreak (break_dest_exp) = ()
 
-fun procEntryExit {level, body} =
-  let
-      val frame = getFrame level
-      val fixed_body = Frame.procEntryExit1 (frame, unNx body)
-  in
-      fragList := Frame.PROC {body=fixed_body, frame = frame} :: !fragList
-  end
+fun initBeforeBody (init_exp_list, body_exp) = ()
 
+fun transArray (size_exp, init_exp) = ()
+
+A = Absyn					
+					
+fun transBinop (A_oper, left_exp, right_exp) =
+  case A_oper of
+      A.PlusOp => Ex T.BINOP (T.PLUS, left_exp, right_exp)
+    | A.MinusOp => Ex T.BINOP (T.MINUS, left_exp, right_exp)
+    | A.TimesOp => Ex T.BINOP (T.MUL, left_exp, right_exp)
+    | A.DivideOp => Ex T.BINOP (T.DIV, left_exp, right_exp)
+    | _ => Ex T.CONST 0 (* shouldn't be called *)
+
+fun transRelop (A_oper, left_exp, right_exp) =
+  let
+    val T_relop =
+	case A_oper of
+	    A.EqOp => T.EQ
+	  | A.NeqOp => T.NE
+	  | A.LtOp => T.LT
+	  | A.LeOp => T.LE
+	  | A.GtOp => T.GT
+	  | A.GeOp => T.GE
+    val cjump_fun fun (t_label, f_label) =
+		    T.CJUMP (T_relop, left_exp, right_exp, t_label, f_label)
+  in
+    Cx cjump_fun
+  end
+    
 end

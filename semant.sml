@@ -305,6 +305,7 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level, breakDest:Tree.exp) =
           val {exp=hi_exp, ty=hi_ty} = trexp hi
 	  val i_access = Trans.allocLocal level escape
           val venv' = S.enter (venv, id, E.VarEntry {access=i_access, ty=T.INT})
+	  val i_var_exp = Trans.simpleVar (i_access, level)
 	  val break_dest_new = Trans.newBreakDest()
         in
           loop_nest_level := !loop_nest_level + 1;
@@ -315,7 +316,7 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level, breakDest:Tree.exp) =
             checkInt(lo_ty, pos);
             checkInt(hi_ty, pos);
             checkUnit(body_ty, pos);
-            {exp=Trans.transFor(i_access, lo_exp, hi_exp, body_exp, break_dest), ty=T.UNIT}
+            {exp=Trans.transFor(i_var_exp, lo_exp, hi_exp, body_exp, break_dest), ty=T.UNIT}
           end
         end
       | trexp (A.BreakExp(pos)) = (
@@ -324,107 +325,120 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level, breakDest:Tree.exp) =
         else ();
         {exp=Trans.transBreak(break_dest), ty=T.BOTTOM}
       )
-      | trexp (A.LetExp{decs=[],body,pos}) =
-	trexp body
-      | trexp (A.LetExp{decs=[dec],body,pos}) =
+      | trexp (A.LetExp{decs=decs,body,pos}) =
 	let
-          val {venv=venv',tenv=tenv'} = transDec(venv,tenv,dec)
+	  (* val foldl : ('a * 'b -> 'b) -> 'b -> 'a list -> 'b  *)
+	  fun combineEnv (
+	    dec,
+	    {venv=venv,tenv=tenv,level=level,break_dest=break_dest,init_list=init_list}
+	  ) =
+	    let
+	      val {venv=venv',tenv=tenv',level=level',break_dest=break_dest',init_exp=init_exp} =
+		  transDec(venv,tenv,level,break_dest,dec)
+	    in
+	      {venv=venv',tenv=tenv',level=level',break_dest=break_dest',init_list=init_exp::init_list}
+	    end	      
+	  val {venv=venv',tenv=tenv',level=level',break_dest=break_dest',init_list=init_list} = (
+	    foldl combineEnv
+		  {venv=venv,tenv=tenv,level=level,break_dest=break_dest,init_list=[]}
+		  decs
+	  )
+	  val body_exp = transExp (venv',tenv',level',break_dest') body
+	  val initiated_body_exp = Trans.initBeforeBody(init_list, body_exp)
 	in
-          transExp(venv',tenv') body
+	  initiated_body_exp
 	end
-      | trexp (A.LetExp{decs=dec::decs,body,pos}) =
+      | trexp (A.ArrayExp{typ,size,init, pos}) =
+	(* The tyId must refer to an array type. *)
+        (* The expression in square brackets must be int, and *)
+        (* the expression after of must match the element *)
+        (* type of the array. The result type is the array type. *)
 	let
-	  val {venv=venv',tenv=tenv'} = transDec(venv,tenv,dec)
+          val arr_ty = lookT (tenv, typ, pos)
+          val {exp=size_exp, ty=size_ty} = trexp size
+          val {exp=init_exp, ty=init_ty} = trexp init
 	in
-	  transExp (venv',tenv') (A.LetExp{decs=decs,body=body,pos=pos})
+          if checkArray (arr_ty, pos)
+          then
+            if checkInt (size_ty, pos)
+            then
+              case arr_ty of
+                  T.ARRAY (ele_ty, _) => (
+		 if isAssignable (actualTy ele_ty) init_ty
+                 then {exp=Trans.transArray(size_exp, init_exp), ty=arr_ty}
+                 else (err pos "Init type doesn't match array dec.";
+		       {exp=Trans.transNil(), ty=arr_ty})
+	       )
+                | _ => {exp=Trans.transNil(), ty=T.BOTTOM}
+            else (err pos "Size type should be Int."; {exp=Trans.transNil(), ty=arr_ty})
+          else {exp=Trans.transNil(), ty=T.BOTTOM}
 	end
-        | trexp (A.ArrayExp{typ,size,init, pos}) =
-          (* The tyId must refer to an array type. *)
-          (* The expression in square brackets must be int, and *)
-          (* the expression after of must match the element *)
-          (* type of the array. The result type is the array type. *)
-	      let
-              val arr_ty = lookT (tenv, typ, pos)
-              val {exp=size_exp, ty=size_ty} = trexp size
-              val {exp=init_exp, ty=init_ty} = trexp init
-	      in
-              if checkArray (arr_ty, pos)
-              then
-                  if checkInt (size_ty, pos)
-                  then
-                      case arr_ty of
-                          T.ARRAY (ele_ty, _) => if isAssignable (actualTy ele_ty) init_ty
-                                                  then {exp=(), ty=arr_ty}
-                                                  else (err pos "Init type doesn't match array dec.";{exp=(), ty=arr_ty})
-                        | _ => {exp=(), ty=T.BOTTOM}
-                  else (err pos "Size type should be Int."; {exp=(), ty=arr_ty})
-              else {exp=(), ty=T.BOTTOM}
-	      end
-      and troper (left,oper,right,pos) =
-          let
-              val {exp=left_exp, ty=left_ty} = trexp left
-              val {exp=right_exp, ty=right_ty} = trexp right
-          in
-              case oper of
-                  (A.PlusOp | A.MinusOp | A.TimesOp | A.DivideOp ) => (
-                   checkInt(left_ty, pos);
-                   checkInt(right_ty, pos);
-                   {exp=(), ty=T.INT}
-               )
-               |  (A.EqOp | A.NeqOp ) => (
-                   if isCompatible left_ty right_ty
-                   then {exp=(), ty=T.INT}
-                   else (err pos ("Left and right types are not compatible, where left :" ^ (T.toString left_ty) ^ " right :" ^ (T.toString right_ty));{exp=(), ty=T.INT})
-               )
-               | (A.LtOp | A.LeOp | A.GtOp | A.GeOp) => (
-                   if isCompatible left_ty right_ty
-                   then case left_ty of
-                         (T.STRING | T.INT
-                         | T.WINT) => {exp=(), ty=T.INT}
-                         | _ => (err pos "Only string or int can be compared for order."; {exp=(), ty=T.INT})
-                   else (err pos ("Left and right types are not compatible, where left :" ^ (T.toString left_ty) ^ " right :" ^ (T.toString right_ty));{exp=(), ty=T.INT})
-
-               )
-          end
-      and trvar (A.SimpleVar(id, pos)) =
-          (
-            case S.look(venv,id) of
-		(* IR *)
-	            SOME(E.VarEntry{access, ty=var_ty}) => {exp=Trans.simpleVar(access, level), ty=actualTy var_ty}
-	          | _ =>
-                (
-	              err pos ("Undefined variable " ^ S.name id);
-	              {exp=(), ty=T.BOTTOM}
-                )
-          )
-        | trvar (A.FieldVar(var, id, pos)) =
-	      let
-	          val {exp=var_exp, ty=var_ty} = trvar var
-	          val fieldList =
-	              case var_ty of
-		              T.RECORD (fieldList, uniq) => fieldList
-		            | t => (err pos ("Variable not record, but " ^ (T.toString t)); [])
-              fun findFieldTy ([], fname) = (err pos ("Field "^S.name fname ^ " doesn't exist."); {exp=(), ty=T.BOTTOM})
-                | findFieldTy ((dec_name, dec_ty)::ftail, fname) =
-                  if dec_name = fname
-                  then {exp=(), ty=actualTy dec_ty}
-                  else findFieldTy (ftail, fname)
-	      in
-              findFieldTy (fieldList, id)
-	      end
-        | trvar (A.SubscriptVar(var, index, pos)) =
-	      let
-	          val {exp=var_exp, ty=var_ty} = trvar var
-              val {exp=index_exp, ty=index_ty} = trexp index
-	      in
-              checkInt(index_ty, pos);
-              checkArray(var_ty, pos);
-              case var_ty of
-                  T.ARRAY (ele_ty, _) => {exp=(), ty=actualTy ele_ty}
-                | _ => {exp=(), ty=T.BOTTOM}
-	      end
+    and troper (left,oper,right,pos) =
+        let
+          val {exp=left_exp, ty=left_ty} = trexp left
+          val {exp=right_exp, ty=right_ty} = trexp right
+        in
+          case oper of
+              (A.PlusOp | A.MinusOp | A.TimesOp | A.DivideOp ) => (
+             checkInt(left_ty, pos);
+             checkInt(right_ty, pos);
+             {exp=Trans.transBinop(oper, left_exp, right_exp), ty=T.INT}
+           )
+           |  (A.EqOp | A.NeqOp ) => (
+             if isCompatible left_ty right_ty
+             then {exp=Trans.transRelop(oper, left_exp, right_exp), ty=T.INT}
+             else (err pos ("Left and right types are not compatible, where left :" ^ (T.toString left_ty) ^ " right :" ^ (T.toString right_ty));
+		   {exp=Trans.transNil(), ty=T.INT})
+           )
+           | (A.LtOp | A.LeOp | A.GtOp | A.GeOp) => (
+             if isCompatible left_ty right_ty
+             then case left_ty of
+                      (T.STRING | T.INT
+                      | T.WINT) => {exp=Trans.transRelop(oper, left_ty, right_ty), ty=T.INT}
+                    | _ => (err pos "Only string or int can be compared for order.";
+			    {exp=Trans.transNil(), ty=T.INT})
+             else (err pos ("Lneft and right types are not compatible, where left :" ^ (T.toString left_ty) ^ " right :" ^ (T.toString right_ty));
+		   {exp=Trans.transNil(), ty=T.INT})
+           )
+        end
+    and trvar (A.SimpleVar(id, pos)) =
+	(
+          case S.look(venv,id) of
+	      SOME(E.VarEntry{access, ty=var_ty}) => {
+	     exp=Trans.simpleVar(access, level), ty=actualTy var_ty
+	   }
+	    | _ => (err pos ("Undefined variable " ^ S.name id);
+	        {exp=Trans.transNil(), ty=T.BOTTOM}
+              )
+        )
+      | trvar (A.FieldVar(var, id, pos)) =
+	let
+	  val {exp=var_exp, ty=var_ty} = trvar var
+	  val fieldList =
+	      case var_ty of
+		  T.RECORD (fieldList, uniq) => fieldList
+		| t => (err pos ("Variable not record, but " ^ (T.toString t)); [])
+          fun findFieldTy ([], fname) = (err pos ("Field "^S.name fname ^ " doesn't exist."); {exp=(), ty=T.BOTTOM})
+            | findFieldTy ((dec_name, dec_ty)::ftail, fname) =
+              if dec_name = fname
+              then {exp=(), ty=actualTy dec_ty}
+              else findFieldTy (ftail, fname)
+	in
+          findFieldTy (fieldList, id)
+	end
+      | trvar (A.SubscriptVar(var, index, pos)) =
+	let
+	  val {exp=var_exp, ty=var_ty} = trvar var
+          val {exp=index_exp, ty=index_ty} = trexp index
+	in
+          checkInt(index_ty, pos);
+          checkArray(var_ty, pos);
+          case var_ty of
+              T.ARRAY (ele_ty, _) => {exp=(), ty=actualTy ele_ty}
+            | _ => {exp=(), ty=T.BOTTOM}
+	end
   in
-      trexp
+    trexp
   end
 and transDec (venv,tenv,A.FunctionDec(fundecs)) : {venv:venv,tenv:tenv} =
     let
