@@ -1,0 +1,9 @@
+let
+    var x := 1
+    var y := 2
+in
+    x + y;
+    x * y;
+    x - y;
+    x / y
+end

@@ -1,0 +1,12 @@
+let
+    var x := 1
+    function f (y:int):int =
+    let
+        function g(z:int):int = x + y + z
+    in
+        g(3)
+    end
+in
+    f(x+1)
+end
+        

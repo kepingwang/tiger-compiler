@@ -20,6 +20,8 @@ val loop_nest_level = ref 0
 
 fun say s = TextIO.output (TextIO.stdOut, s ^"\n")
 
+fun has_error () = !ErrorMsg.anyErrors
+
 fun has_duplicate_item [] = (0, false)
   | has_duplicate_item ((x, pos)::xs) =
     if (List.exists (fn (y, pos_y) => x = y) xs)
@@ -155,7 +157,7 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level, break_dest:Trans.exp) =
         | trexp (A.CallExp{func=func_name,args,pos}) =
           let
               (* trargs(formals: T.ty list, args: A.exp list) : Trans.exp list *)
-              (* type check arguments and return Tree.exp list of arguments *)
+              (* type check arguments and return Trans.exp list of arguments *)
               fun trargs ([], []) : Trans.exp list = []
                 | trargs (formal_head::formal_tail, arg_head::arg_tail) =
                   let
@@ -172,13 +174,18 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level, break_dest:Trans.exp) =
                 | trargs (_ ,[]) = (err pos "Too few arguments."; [])
           in
               case S.look(venv,func_name) of
-                  SOME(E.FunEntry{level=flevel,formals,result}) => (
-                   { exp=Trans.call(level,flevel,trargs(formals, args)),
-                     ty=result
-                   }
-               )
+                  SOME(E.FunEntry{level=dec_level,formals,result}) =>
+                  let
+                      val arg_exp_list = trargs(formals, args)
+                  in
+                      if has_error ()
+                      then {exp=Trans.errorExp (),ty=T.BOTTOM}
+                      else { exp=Trans.call(level,dec_level,arg_exp_list),
+                             ty=result
+                           }
+                  end
                 | _ => ( err pos ("function "^S.name func_name^" not defined");
-                         {exp=Trans.nil(),ty=T.BOTTOM}
+                         {exp=Trans.errorExp (),ty=T.BOTTOM}
                        )
           end
         | trexp (A.OpExp{left,oper,right,pos}) = troper(left,oper,right,pos)
@@ -314,34 +321,38 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level, break_dest:Trans.exp) =
                   checkInt(lo_ty, pos);
                   checkInt(hi_ty, pos);
                   checkUnit(body_ty, pos);
-                  {exp=Trans.forExp(i_var_exp, lo_exp, hi_exp, body_exp, break_dest), ty=T.UNIT}
+                  if has_error ()
+                  then {exp=Trans.errorExp (), ty=T.UNIT}
+                  else {exp=Trans.forExp(i_var_exp, lo_exp, hi_exp, body_exp, break_dest), ty=T.UNIT}
               end
           end
         | trexp (A.BreakExp(pos)) = (
             if !loop_nest_level = 0
             then err pos "Break can only be inside a loop."
             else ();
-            {exp=Trans.breakExp(break_dest), ty=T.BOTTOM}
+            if has_error()
+            then {exp=Trans.errorExp(), ty=T.BOTTOM}
+            else {exp=Trans.breakExp(break_dest), ty=T.BOTTOM}
         )
         | trexp (A.LetExp{decs=decs,body,pos}) =
           let
               (* val foldl : ('a * 'b -> 'b) -> 'b -> 'a list -> 'b  *)
               fun combineEnv (
                   dec,
-                  {venv=venv,tenv=tenv,level=level,break_dest=break_dest,init_list=init_list}
+                  {venv=venv,tenv=tenv,init_list=init_list}
               ) =
                 let
-                    val {venv=venv',tenv=tenv',level=level',break_dest=break_dest',init_exp=init_exp} =
-                        transDec(venv,tenv,level,break_dest,dec)
+                    val {venv=venv',tenv=tenv',init_exp=init_exp} =
+                        transDec(venv,tenv,level,dec)
                 in
-                    {venv=venv',tenv=tenv',level=level',break_dest=break_dest',init_list=init_list @ init_exp}
+                    {venv=venv',tenv=tenv',init_list=init_list @ init_exp}
                 end
-              val {venv=venv',tenv=tenv',level=level',break_dest=break_dest',init_list=init_list} = (
+              val {venv=venv',tenv=tenv',init_list=init_list} = (
                   foldl combineEnv
-                        {venv=venv,tenv=tenv,level=level,break_dest=break_dest,init_list=[]}
+                        {venv=venv,tenv=tenv,init_list=[]}
                         decs
               )
-              val {exp=body_exp, ty=body_ty} = transExp (venv',tenv',level',break_dest') body
+              val {exp=body_exp, ty=body_ty} = transExp (venv',tenv',level,break_dest) body
               val initiated_body_exp = Trans.initBeforeBody(init_list, body_exp)
           in
               {exp=initiated_body_exp, ty=body_ty}
@@ -445,8 +456,8 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level, break_dest:Trans.exp) =
   end
 (* val {venv=venv',tenv=tenv',level=level',break_dest=break_dest',init_exp=init_exp} = *)
 (* transDec(venv,tenv,level,break_dest,dec) *)
-and transDec (venv,tenv,level,break_dest,A.FunctionDec(fundecs)) :
-    {venv:venv,tenv:tenv,level:Trans.level,break_dest:Trans.exp,init_exp:Trans.exp list} =
+and transDec (venv,tenv,level, A.FunctionDec(fundecs)) :
+    {venv:venv,tenv:tenv,init_exp:Trans.exp list} =
     let
         fun addFunDec ({name=func_name, params, result, body, pos}, venv) =
           let
@@ -472,7 +483,7 @@ and transDec (venv,tenv,level,break_dest,A.FunctionDec(fundecs)) :
                     | _ => level (* IR TODO: cannot be reached*)
               val access_list = Trans.formals level
               val venv'' = foldl addFunParam venv' (ListPair.zip(params, access_list))
-              val {exp=body_exp, ty=body_ty} = transExp (venv'', tenv, level, break_dest) body
+              val {exp=body_exp, ty=body_ty} = transExp (venv'', tenv, level, Trans.newBreakDest() ) body
               val _ = Trans.procEntryExit {level=level, body=body_exp}
               val result_ty = case result of
                                   SOME(type_name, pos) => lookT (tenv, type_name, pos)
@@ -487,11 +498,11 @@ and transDec (venv,tenv,level,break_dest,A.FunctionDec(fundecs)) :
         if  dup_bool then err dup_pos "Duplicated names in a sequence of function declarations."
         else ();
         map transFunBody fundecs;
-        {venv=venv',tenv=tenv,level=level,break_dest=break_dest, init_exp=[]}
+        {venv=venv',tenv=tenv, init_exp=[]}
     end
-  | transDec (venv,tenv,level,break_dest,A.VarDec{name,escape,typ=type_option,init,pos}) =
+  | transDec (venv,tenv,level, A.VarDec{name,escape,typ=type_option,init,pos}) =
     let
-        val {exp=init_exp,ty=init_ty} = transExp (venv,tenv,level,break_dest) init
+        val {exp=init_exp,ty=init_ty} = transExp (venv,tenv,level,Trans.newBreakDest () ) init
         val access = Trans.allocLocal level (!escape)
         val val_exp = Trans.simpleVar (access, level)
         val init_assign_exp = Trans.assign (val_exp, init_exp)
@@ -514,9 +525,9 @@ and transDec (venv,tenv,level,break_dest,A.FunctionDec(fundecs)) :
                     | _ => S.enter (venv, name, E.VarEntry {access=access, ty=init_ty})
               )
     in
-        {venv=venv',tenv=tenv,level=level,break_dest=break_dest, init_exp=[init_assign_exp] }
+        {venv=venv',tenv=tenv, init_exp=[init_assign_exp] }
     end
-  | transDec (venv,tenv,level,break_dest,A.TypeDec(decList)) =
+  | transDec (venv,tenv,level,A.TypeDec(decList)) =
     (* Using foldl recursively add each symbol name into our environment, next we will give each an 'actual type'*)
     let
         val tenv' = List.foldl (fn({name, ...},tenv) => S.enter(tenv,name,T.NAME(name,ref NONE))) tenv decList
@@ -539,7 +550,7 @@ and transDec (venv,tenv,level,break_dest,A.FunctionDec(fundecs)) :
             if cycle_found then reset_types typ_list
             else ()
         end;
-        {venv=venv, tenv=tenv', level=level, break_dest=break_dest, init_exp=[]}
+        {venv=venv, tenv=tenv', init_exp=[]}
     end
 (* we take in an A.NameType and return the true T.Type, unless we can't find it*)
 and transTy (tenv, A.NameTy(tid,pos)) =
@@ -571,13 +582,12 @@ and transTy (tenv, A.NameTy(tid,pos)) =
 fun transProg (exp:A.exp) : Trans.frag list =
   let
       (* TODO outermost should contain system functions? *)
+      val _ = FindEscape.findEscape exp
       val outermost = Trans.outermost
-      val break_dest = Trans.nil()
-      val {exp=body_exp, ty=_} = transExp(E.base_venv, E.base_tenv, outermost, break_dest) exp
+      val {exp=body_exp, ty=_} = transExp(E.base_venv, E.base_tenv, outermost, Trans.newBreakDest() ) exp
       val _ = Trans.procEntryExit {level=outermost, body=body_exp}
   in
       Trans.getResult()
   end
-
 
 end

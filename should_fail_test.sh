@@ -11,10 +11,10 @@ echo testing $file
 if test -z $2; then
     cat $file
     echo -----------------------------------------------
-    ./gen.sh $file | sml | python3 outfilter.py
+    sed "s:\$1:$file:g" template.sml | sml | python3 outfilter.py
     ret=$?
 else
-    ./gen.sh $file | sml
+    sed "s:\$1:$file:g" template.sml | sml | python3 outfilter.py
     ret=$?
 fi
 echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

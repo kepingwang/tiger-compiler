@@ -39,6 +39,7 @@ sig
   val relop: Aexp * exp * exp -> exp
   val binop: Aexp * exp * exp -> exp
   val addToSeq: exp * exp -> exp
+  val errorExp: unit -> exp
   structure Frame : FRAME
   type frag
   val getResult : unit -> Frame.frag list
@@ -139,6 +140,7 @@ fun formals level =
        end
      | OUTERMOST _ => []
   )
+fun errorExp () = Ex (T.CONST 0)
 fun simpleVar ( (dec_level, access), use_level) = Ex (Frame.exp access (
                                                            traceStaticLink (dec_level, use_level, T.TEMP Frame.FP)
                                                        )
