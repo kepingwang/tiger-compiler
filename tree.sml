@@ -37,7 +37,7 @@ datatype stm = SEQ of stm * stm
              | LABEL of label
              | JUMP of exp * label list
              | CJUMP of relop * exp * exp * label * label
-	     | MOVE of exp * exp
+	         | MOVE of exp * exp
              | EXP of exp
 
      and exp = BINOP of binop * exp * exp
