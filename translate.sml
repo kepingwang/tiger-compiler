@@ -9,7 +9,6 @@ sig
     (* when calling Frame.newFrame, Translate passes static link as
      an extra escaped parameter. Frame.newFrame(label, true::formals) *)
     parent: level,
-    name: Temp.label,
     formals: bool list
   } -> level
   val formals : level -> access list
@@ -18,14 +17,20 @@ sig
 
 
   type exp
-  val transNil: unit->exp
-  val transInt: int->exp
-  val transString: string->exp
-  val transIfThen: exp * exp -> exp
-  val transIfThenElse: exp * exp * exp -> exp
-  val transNewBreakDest: unit -> exp
-  val transWhile: exp * exp * exp -> exp
-  val transFor: exp * exp * exp * exp * exp -> exp
+  val nil: unit->exp
+  val int: int->exp
+  val string: string->exp
+  val call: level * level * exp list -> exp
+  val assign: exp * exp -> exp
+  val record: exp list -> exp
+  val breakExp: exp -> exp
+  val initBeforeBody: exp list * exp -> exp
+  val array: exp * exp -> exp
+  val ifThen: exp * exp -> exp
+  val ifThenElse: exp * exp * exp -> exp
+  val newBreakDest: unit -> exp
+  val whileExp: exp * exp * exp -> exp
+  val forExp: exp * exp * exp * exp * exp -> exp
   val simpleVar : (access * level) -> exp
   val procEntryExit : {level: level, body: exp} -> unit
   structure Frame : FRAME
@@ -43,14 +48,16 @@ type access = level * Frame.access
 type frag = Frame.frag
 (* Frame shouldn't know anything about static links, it is the responsibility of Translate. *)
 fun getFrame (LEVEL {frame, ...}) = frame
+  | getFrame (OUTERMOST {frame, ...}) = frame
 fun parentLevel (LEVEL {parent, ...}) = parent
-fun newLevel {parent, name, formals} =
+  | parentLevel outerlevel = outerlevel
+fun newLevel {parent, formals} =
   (* pass static link as an extra element *)
-  {parent=parent,
-   frame=Frame.newFrame {name=name, formals=true::formals},
-   uniq=ref ()}
-val outermost = OUTERMOST {frame=Frame.newFrame  {name = Temp.newlabel(), formals = [true] } } 
+  LEVEL {parent=parent,
+         frame=Frame.newFrame {name=Temp.newlabel(), formals=true::formals},
+         uniq=ref ()}
 fun levelName level = Frame.name (getFrame level)
+val outermost = OUTERMOST {frame=Frame.newFrame  {name = Temp.newlabel(), formals = [true] } }
 structure A = Absyn
 structure T = Tree
 (* Translate from Absyn.exp to exp *)
@@ -58,7 +65,8 @@ datatype exp = Ex of Tree.exp
 	         | Nx of Tree.stm
 	         | Cx of Temp.label * Temp.label -> Tree.stm
 
-fun seq [s1, s2] = Tree.SEQ (s1, s2)
+fun seq [] = Tree.SEQ (Tree.LABEL (Temp.newlabel() ), Tree.LABEL (Temp.newlabel()))
+  | seq [s1, s2] = Tree.SEQ (s1, s2)
   | seq (head :: tail) = Tree.SEQ(head, seq tail)
 fun unEx (Ex e) = e
   | unEx (Nx s) = T.ESEQ(s, T.CONST 0)
@@ -112,15 +120,30 @@ fun traceStaticLink (dec_level, curr_level, exp) =
   else traceStaticLink (dec_level, parentLevel curr_level,
                         Frame.exp (getStaticLink curr_level) exp) (*TREE.MEM (...) *)
 
-fun formals (LEVEL {frame={formals, ...}, ...}) = formals
+fun formals level =
+  (case level of
+       LEVEL {frame={formals = formals, ...}, ...} =>
+       let
+           val _ :: user_formals = formals
+           val formals_access = map (fn x => (level, x)) user_formals
+       in
+           formals_access
+       end
+     | OUTERMOST _ => []
+  )
 fun simpleVar ( (dec_level, access), use_level) = Ex (Frame.exp access (
                                                            traceStaticLink (dec_level, use_level, T.TEMP Frame.FP)
                                                        )
                                                      )
-
-fun transNil() = Ex (Tree.CONST 0)
-fun transInt number = Ex (Tree.CONST number)
-fun transString str =
+fun allocLocal level esc =
+  let
+      val frame = getFrame level
+  in
+      (level, Frame.allocLocal frame esc)
+  end
+fun nil() = Ex (Tree.CONST 0)
+fun int number = Ex (Tree.CONST number)
+fun string str =
   let
       val str_label = Temp.newlabel()
   in
@@ -128,7 +151,7 @@ fun transString str =
         Ex (Tree.NAME str_label)
       )
   end
-fun transCall (call_level, dec_level, exp_list) =
+fun call (call_level, dec_level, exp_list) =
   let
       val func_label = levelName dec_level
       val arg_list = map unEx exp_list
@@ -137,14 +160,14 @@ fun transCall (call_level, dec_level, exp_list) =
   end
 
 
-fun transAssign (left_exp, right_exp) = Nx (Tree.MOVE (unEx left_exp, unEx right_exp) )
+fun assign (left_exp, right_exp) = Nx (Tree.MOVE (unEx left_exp, unEx right_exp) )
 
-fun transRecord field_exps =
+fun record field_exps =
   let
       val n = List.length field_exps
       val r = Temp.newtemp()
       val (init_seq, _) = foldl (fn (exp, (s_list, offset)) => (
-                                    unNx (transAssign ((Ex (Tree.MEM
+                                    unNx (assign ((Ex (Tree.MEM
                                                            (T.BINOP
                                                                 (T.PLUS, T.TEMP r, T.CONST (offset * Frame.wordSize)
                                                                 )
@@ -156,30 +179,57 @@ fun transRecord field_exps =
                                 )) ([], 0) field_exps
       val all_seq = Tree.MOVE (T.TEMP r, Frame.externalCall ("malloc", [T.CONST (n * Frame.wordSize)])) :: init_seq
   in
-      Tree.ESEQ (seq all_seq, T.TEMP r)
+      Ex (Tree.ESEQ (seq all_seq, T.TEMP r))
   end
 
-fun transWhile (test_exp, body_exp, break_dest) = ()
+fun recordField (var_exp, offset) = Ex (T.MEM (T.BINOP (T.PLUS, unEx var_exp, T.CONST (offset * Frame.wordSize))))
 
-fun transFor (i_access, lo_exp, hi_exp, body_exp, break_dest) = ()  
+fun breakExp done_lb =
+  let
+      val (T.LABEL done_lb) = unNx done_lb
+  in
+      Nx (T.JUMP (T.NAME done_lb, [done_lb]))
+  end
 
-fun transBreak (break_dest_exp) = ()
+fun initBeforeBody (init_exp_list, body_exp) =
+  let
+      val seq_list = map unNx init_exp_list
+      val body_exp = unEx body_exp
+  in
+      Ex (T.ESEQ (seq seq_list, body_exp))
+  end
 
-fun initBeforeBody (init_exp_list, body_exp) = ()
+(*TODO: add length into array*)
+fun array (size_exp, init_exp) =
+  let
+      val r = Temp.newtemp()
+      val size = Temp.newtemp()
+      val alloc_stmt = Tree.MOVE (T.TEMP r, Frame.externalCall ("malloc", [T.TEMP size]))
+      val init_stmt = Tree.EXP (Frame.externalCall ("initArray", [T.TEMP size, unEx init_exp]))
+  in
+      Ex (T.ESEQ (
+          seq [
+              alloc_stmt,
+              init_stmt
+          ],
+          T.TEMP r
+           )
+         )
+  end
 
-fun transArray (size_exp, init_exp) = ()
+fun arraySubscript (var_exp, index_exp) = Ex (T.MEM (T.BINOP (T.PLUS, unEx var_exp, unEx index_exp)))
 
-A = Absyn					
-					
-fun transBinop (A_oper, left_exp, right_exp) =
+structure A = Absyn
+
+fun binop (A_oper, left_exp, right_exp) =
   case A_oper of
-      A.PlusOp => Ex T.BINOP (T.PLUS, left_exp, right_exp)
-    | A.MinusOp => Ex T.BINOP (T.MINUS, left_exp, right_exp)
-    | A.TimesOp => Ex T.BINOP (T.MUL, left_exp, right_exp)
-    | A.DivideOp => Ex T.BINOP (T.DIV, left_exp, right_exp)
-    | _ => Ex T.CONST 0 (* shouldn't be called *)
+      A.PlusOp => Ex (T.BINOP (T.PLUS, left_exp, right_exp))
+    | A.MinusOp => Ex (T.BINOP (T.MINUS, left_exp, right_exp))
+    | A.TimesOp => Ex (T.BINOP (T.MUL, left_exp, right_exp))
+    | A.DivideOp => Ex (T.BINOP (T.DIV, left_exp, right_exp))
+    | _ => Ex (T.CONST 0) (* shouldn't be called *)
 
-fun transRelop (A_oper, left_exp, right_exp) =
+fun relop (A_oper, left_exp, right_exp) =
   let
     val T_relop =
 	case A_oper of
@@ -189,13 +239,13 @@ fun transRelop (A_oper, left_exp, right_exp) =
 	  | A.LeOp => T.LE
 	  | A.GtOp => T.GT
 	  | A.GeOp => T.GE
-    val cjump_fun fun (t_label, f_label) =
+    fun cjump_fun (t_label, f_label) =
 		    T.CJUMP (T_relop, left_exp, right_exp, t_label, f_label)
   in
     Cx cjump_fun
   end
- 
-fun transIfThen (test, exp1) =
+
+fun ifThen (test, exp1) =
   let
       val tlb = Temp.newlabel()
       val flb =Temp.newlabel()
@@ -209,7 +259,7 @@ fun transIfThen (test, exp1) =
           T.LABEL flb
       ])
   end
-fun transIfThenElse (test, exp1, exp2) =
+fun ifThenElse (test, exp1, exp2) =
     let
         val tlb = Temp.newlabel ()
         val flb =Temp.newlabel ()
@@ -233,8 +283,8 @@ fun transIfThenElse (test, exp1, exp2) =
            )
     end
 
-fun transNewBreakDest () =  Nx (T.LABEL (Temp.newlabel () ))
-fun transWhile (test, body, done_lb) =
+fun newBreakDest () =  Nx (T.LABEL (Temp.newlabel () ))
+fun whileExp (test, body, done_lb) =
   let
       val (T.LABEL done_lb) = unNx done_lb
       val start_lb = Temp.newlabel ()
@@ -251,7 +301,7 @@ fun transWhile (test, body, done_lb) =
            ]
          )
   end
-fun transFor (i_exp, lo, hi, body, done_lb) =
+fun forExp (i_exp, lo, hi, body, done_lb) =
   let
       val (T.LABEL done_lb) = unNx done_lb
       val limit = Temp.newtemp()
@@ -274,4 +324,11 @@ fun transFor (i_exp, lo, hi, body, done_lb) =
          ])
   end
 
+fun procEntryExit {level, body} =
+  let
+      val frame = getFrame level
+      val fixed_body = Frame.procEntryExit1 (frame, unNx body)
+  in
+      fragList := Frame.PROC {body=fixed_body, frame = frame} :: !fragList
+  end
 end
