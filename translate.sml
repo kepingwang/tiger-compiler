@@ -358,7 +358,8 @@ fun forExp (i_exp, lo, hi, body, done_lb) =
 fun procEntryExit {level, body} =
   let
       val frame = getFrame level
-      val fixed_body = Frame.procEntryExit1 (frame, unNx body)
+      val body_with_return = T.MOVE (T.TEMP Frame.RV, unEx body)
+      val fixed_body = Frame.procEntryExit1 (frame, body_with_return)
   in
       fragList := Frame.PROC {body=fixed_body, frame = frame} :: !fragList
   end
