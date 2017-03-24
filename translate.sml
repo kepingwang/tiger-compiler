@@ -17,6 +17,7 @@ sig
 
 
   type exp
+  type Aexp
   val nil: unit->exp
   val int: int->exp
   val string: string->exp
@@ -24,6 +25,8 @@ sig
   val assign: exp * exp -> exp
   val record: exp list -> exp
   val breakExp: exp -> exp
+  val recordField: exp * int -> exp
+  val arraySubscript: exp * exp -> exp
   val initBeforeBody: exp list * exp -> exp
   val array: exp * exp -> exp
   val ifThen: exp * exp -> exp
@@ -33,6 +36,9 @@ sig
   val forExp: exp * exp * exp * exp * exp -> exp
   val simpleVar : (access * level) -> exp
   val procEntryExit : {level: level, body: exp} -> unit
+  val relop: Aexp * exp * exp -> exp
+  val binop: Aexp * exp * exp -> exp
+  val addToSeq: exp * exp -> exp
   structure Frame : FRAME
   type frag
   val getResult : unit -> Frame.frag list
@@ -59,6 +65,7 @@ fun newLevel {parent, formals} =
 fun levelName level = Frame.name (getFrame level)
 val outermost = OUTERMOST {frame=Frame.newFrame  {name = Temp.newlabel(), formals = [true] } }
 structure A = Absyn
+type Aexp = A.oper
 structure T = Tree
 (* Translate from Absyn.exp to exp *)
 datatype exp = Ex of Tree.exp
@@ -135,6 +142,7 @@ fun simpleVar ( (dec_level, access), use_level) = Ex (Frame.exp access (
                                                            traceStaticLink (dec_level, use_level, T.TEMP Frame.FP)
                                                        )
                                                      )
+fun addToSeq (exp1, exp2) = Ex (Tree.ESEQ (unNx exp1, unEx exp2))
 fun allocLocal level esc =
   let
       val frame = getFrame level
@@ -222,24 +230,32 @@ fun arraySubscript (var_exp, index_exp) = Ex (T.MEM (T.BINOP (T.PLUS, unEx var_e
 structure A = Absyn
 
 fun binop (A_oper, left_exp, right_exp) =
-  case A_oper of
-      A.PlusOp => Ex (T.BINOP (T.PLUS, left_exp, right_exp))
-    | A.MinusOp => Ex (T.BINOP (T.MINUS, left_exp, right_exp))
-    | A.TimesOp => Ex (T.BINOP (T.MUL, left_exp, right_exp))
-    | A.DivideOp => Ex (T.BINOP (T.DIV, left_exp, right_exp))
-    | _ => Ex (T.CONST 0) (* shouldn't be called *)
+  let
+      val left_exp = unEx left_exp
+      val right_exp = unEx right_exp
+  in
+      case A_oper of
+          A.PlusOp => Ex (T.BINOP (T.PLUS, left_exp, right_exp))
+        | A.MinusOp => Ex (T.BINOP (T.MINUS, left_exp, right_exp))
+        | A.TimesOp => Ex (T.BINOP (T.MUL, left_exp, right_exp))
+        | A.DivideOp => Ex (T.BINOP (T.DIV, left_exp, right_exp))
+        | _ => Ex (T.CONST 0) (* shouldn't be called *)
+  end
 
 fun relop (A_oper, left_exp, right_exp) =
   let
-    val T_relop =
-	case A_oper of
-	    A.EqOp => T.EQ
-	  | A.NeqOp => T.NE
-	  | A.LtOp => T.LT
-	  | A.LeOp => T.LE
-	  | A.GtOp => T.GT
-	  | A.GeOp => T.GE
-    fun cjump_fun (t_label, f_label) =
+      val T_relop =
+	      case A_oper of
+	          A.EqOp => T.EQ
+	        | A.NeqOp => T.NE
+	        | A.LtOp => T.LT
+	        | A.LeOp => T.LE
+	        | A.GtOp => T.GT
+	        | A.GeOp => T.GE
+            | _ => T.EQ (*impossible*)
+      val left_exp = unEx left_exp
+      val right_exp = unEx right_exp
+      fun cjump_fun (t_label, f_label) =
 		    T.CJUMP (T_relop, left_exp, right_exp, t_label, f_label)
   in
     Cx cjump_fun

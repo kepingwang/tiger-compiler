@@ -17,6 +17,7 @@ env.sml
 tree.sml
 frame.sml
 translate.sml
+printtree.sml
 semant.sml
 $/smlnj-lib.cm
 $/ml-yacc-lib.cm
