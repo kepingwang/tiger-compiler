@@ -210,23 +210,11 @@ fun initBeforeBody (init_exp_list, body_exp) =
       Ex (T.ESEQ (seq seq_list, body_exp))
   end
 
-(*TODO: add length into array*)
+(*length is added by initArray*)
 fun array (size_exp, init_exp) =
-  let
-      val r = Temp.newtemp()
-      val size = Temp.newtemp()
-      val alloc_stmt = Tree.MOVE (T.TEMP r, Frame.externalCall ("malloc", [T.TEMP size]))
-      val init_stmt = Tree.EXP (Frame.externalCall ("initArray", [T.TEMP size, unEx init_exp]))
-  in
-      Ex (T.ESEQ (
-          seq [
-              alloc_stmt,
-              init_stmt
-          ],
-          T.TEMP r
-           )
-         )
-  end
+  Ex (
+      Frame.externalCall ("initArray", [unEx size_exp, unEx init_exp])
+  )
 
 fun arraySubscript (var_exp, index_exp) = Ex (T.MEM (T.BINOP (T.PLUS, unEx var_exp, unEx index_exp)))
 
