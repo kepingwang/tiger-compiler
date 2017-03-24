@@ -3,11 +3,15 @@ struct
 
 structure S = Symbol
 structure T = Types
+structure Trans = Translate
 
 type access = int (* TODO: ??? *)
 type ty = T.ty
-datatype enventry = VarEntry of {ty: ty}
-		  | FunEntry of {formals: ty list, result: ty}
+datatype enventry = VarEntry of {access: Translate.access,
+				                 ty: ty}
+		          | FunEntry of {level: Translate.level,
+				                 formals: ty list,
+				                 result: ty}
 
 val base_tenv = S.empty
 val base_tenv = S.enter (base_tenv, S.symbol "int", T.WINT)
@@ -15,23 +19,23 @@ val base_tenv = S.enter (base_tenv, S.symbol "string", T.STRING)
 
 val base_venv = S.empty
 val base_venv = S.enter (base_venv, S.symbol "print",
-                         FunEntry {formals=[T.STRING], result=T.UNIT})
+                         FunEntry {formals=[T.STRING], level=Trans.outermost, result=T.UNIT})
 val base_venv = S.enter (base_venv, S.symbol "flush",
-                         FunEntry {formals=[], result=T.UNIT})
+                         FunEntry {formals=[], level=Trans.outermost, result=T.UNIT})
 val base_venv = S.enter (base_venv, S.symbol "getchar",
-                         FunEntry {formals=[], result=T.STRING})
+                         FunEntry {formals=[], level=Trans.outermost, result=T.STRING})
 val base_venv = S.enter (base_venv, S.symbol "ord",
-			             FunEntry {formals=[T.STRING], result=T.INT})
+			             FunEntry {formals=[T.STRING], level=Trans.outermost, result=T.INT})
 val base_venv = S.enter (base_venv, S.symbol "chr",
-                         FunEntry {formals=[T.INT], result=T.STRING})
+                         FunEntry {formals=[T.INT], level=Trans.outermost, result=T.STRING})
 val base_venv = S.enter (base_venv, S.symbol "size",
-                         FunEntry {formals=[T.STRING], result=T.INT})
+                         FunEntry {formals=[T.STRING], level=Trans.outermost, result=T.INT})
 val base_venv = S.enter (base_venv, S.symbol "substring",
-                         FunEntry {formals=[T.STRING, T.INT, T.INT], result=T.STRING})
+                         FunEntry {formals=[T.STRING, T.INT, T.INT], level=Trans.outermost, result=T.STRING})
 val base_venv = S.enter (base_venv, S.symbol "concat",
-                         FunEntry {formals=[T.STRING, T.STRING], result=T.STRING})
+                         FunEntry {formals=[T.STRING, T.STRING], level=Trans.outermost, result=T.STRING})
 val base_venv = S.enter (base_venv, S.symbol "not",
-                         FunEntry {formals=[T.INT], result=T.INT})
+                         FunEntry {formals=[T.INT], level=Trans.outermost, result=T.INT})
 val base_venv = S.enter (base_venv, S.symbol "exit",
-                         FunEntry {formals=[T.INT], result=T.UNIT})
+                         FunEntry {formals=[T.INT], level=Trans.outermost, result=T.UNIT})
 end
