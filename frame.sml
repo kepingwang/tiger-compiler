@@ -76,5 +76,6 @@ fun formals  {name, formals, stack_local_count} = formals
 fun allocLocal {name, formals, stack_local_count} esc = allocLocalImpl stack_local_count esc
 
 fun externalCall (name, param_list) = Tree.CALL(Tree.NAME(Temp.namedlabel(name)), param_list)
-end
 
+fun procEntryExit1 (frame, body) = body
+end
