@@ -255,7 +255,6 @@ fun binop (A_oper, left_exp, right_exp) =
         | A.MinusOp => Ex (T.BINOP (T.MINUS, left_exp, right_exp))
         | A.TimesOp => Ex (T.BINOP (T.MUL, left_exp, right_exp))
         | A.DivideOp => Ex (T.BINOP (T.DIV, left_exp, right_exp))
-        | _ => Ex (T.CONST 0) (* shouldn't be called *)
   end
 
 fun stringRelop (Aoper, left_exp, right_exp) =
@@ -273,7 +272,6 @@ fun relop (A_oper, left_exp, right_exp) =
 	        | A.LeOp => T.LE
 	        | A.GtOp => T.GT
 	        | A.GeOp => T.GE
-            | _ => T.EQ (*impossible*)
       val left_exp = unEx left_exp
       val right_exp = unEx right_exp
       fun cjump_fun (t_label, f_label) =

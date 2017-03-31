@@ -15,6 +15,7 @@ temp.sig
 env.sig
 env.sml
 tree.sml
+canon.sml
 frame.sml
 translate.sml
 printtree.sml

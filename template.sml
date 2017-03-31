@@ -6,7 +6,14 @@ let val program =  "$1"
     fun printFrag (Frame.PROC {body, frame}) =
       ( print (Symbol.name (Frame.name frame) );
         print (":\n");
-        Printtree.printtree (TextIO.stdOut, body))
+        Printtree.printtree (TextIO.stdOut, body);
+        print ("Linearized:\n");
+        let
+	        val stms = Canon.linearize body
+            val stms' = Canon.traceSchedule(Canon.basicBlocks stms)
+        in
+            app (fn s => Printtree.printtree(TextIO.stdOut,s)) stms
+        end)
       | printFrag (Frame.STRING (label, str)) = (
           print (Symbol.name label);
           print (": " ^ str ^ "\n")
