@@ -17,6 +17,8 @@ env.sml
 tree.sml
 canon.sml
 frame.sml
+codegen.sml
+assem.sml
 translate.sml
 printtree.sml
 escape.sml

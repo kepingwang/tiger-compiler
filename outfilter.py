@@ -15,5 +15,8 @@ while line:
     if line.find("ERROR FOUND") >= 0:
         print("Tiger doesn't compile")
         exit_code = 3
+    if line.find("raised at") >= 0:
+        print("Exception happened")
+        exit_code = 4
     line = sys.stdin.readline()
 sys.exit(exit_code)

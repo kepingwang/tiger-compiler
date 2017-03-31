@@ -12,12 +12,20 @@ let val program =  "$1"
 	        val stms = Canon.linearize body
             val stms' = Canon.traceSchedule(Canon.basicBlocks stms)
         in
-            app (fn s => Printtree.printtree(TextIO.stdOut,s)) stms
+            app (fn s => Printtree.printtree(TextIO.stdOut,s)) stms;
+            print ("Assembly:\n");
+            let
+	            val instrs =   List.concat(map (MipsGen.codegen frame) stms')
+                val format0 = Assem.format(Frame.register_name)
+            in
+                app (fn i => (TextIO.output(TextIO.stdOut, format0 i); print("\n"))) instrs
+            end;
+            print("\n\n")
         end)
       | printFrag (Frame.STRING (label, str)) = (
           print (Symbol.name label);
           print (": " ^ str ^ "\n")
-                )
+      )
 in
     PrintAbsyn.print (TextIO.stdOut , absyn_tree);
     map printFrag frag_list;

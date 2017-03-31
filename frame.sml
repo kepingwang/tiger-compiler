@@ -12,14 +12,19 @@ sig
   (* true if if the new variable escapes and needs to go in the frame. false -> can be allocated in register. *)
 
   val RV : Temp.temp (* as seen by callee*)
+  val RA : Temp.temp (* as seen by callee*)
+  val FP : Temp.temp (* frame pointer *)
+  val SP : Temp.temp (* frame pointer *)
+  val ARGS : Temp.temp list
+  val callersaves : Temp.temp list
+  val calleesaves : Temp.temp list
 
   val procEntryExit1 : frame * Tree.stm -> Tree.stm
-  val FP : Temp.temp (* frame pointer *)
   val wordSize : int
   val exp : access -> Tree.exp -> Tree.exp
   val externalCall: string * Tree.exp list -> Tree.exp
-  val specialregs: Temp.temp list
   (* more...  *)
+  val register_name: Temp.temp -> string
 end
 
 
@@ -40,8 +45,14 @@ type frame = {name: Temp.label,
               stack_local_count: int ref}
 datatype frag = PROC of {body: Tree.stm, frame: frame}
 		      | STRING of Temp.label * string
+val RV = Temp.newtemp()
+val RA = Temp.newtemp()
 val FP = Temp.newtemp() (* frame pointer *)
-val RV = Temp.newtemp() (* return value reg*)
+val SP = Temp.newtemp() (* frame pointer *)
+val ARGS = [Temp.newtemp(), Temp.newtemp(), Temp.newtemp(), Temp.newtemp()]
+val callersaves = []
+val calleesaves = []
+fun register_name t = if t = RV then "v0" else Temp.makestring t
 val wordSize = 4 (* ? *)
 fun exp access exp =
   (* used to turn a Frame.access into Tree.exp, exp param is the address of the FP*)
