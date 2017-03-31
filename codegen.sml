@@ -259,7 +259,7 @@ fun codegen frame stm =
         result ( fn (r) => (
                    emit(A.OPER{
                            assem="sub $sp, $sp, " ^
-				 (Int.toString (Frame.wordSize * (List.blength params))),
+				 (Int.toString (Frame.wordSize * (List.length params))),
                            src=[Frame.SP],
                            dst=[Frame.SP],
                            jump=NONE
