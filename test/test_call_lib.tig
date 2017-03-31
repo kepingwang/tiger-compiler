@@ -1,0 +1,7 @@
+let
+    var x:=getchar()
+    var y:=concat("hello", "o")
+in
+    x;
+    y
+end
