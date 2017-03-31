@@ -23,6 +23,7 @@ translate.sml
 printtree.sml
 escape.sml
 semant.sml
+main.sml
 $/smlnj-lib.cm
 $/ml-yacc-lib.cm
 $/basis.cm

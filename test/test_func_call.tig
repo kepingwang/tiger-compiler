@@ -1,5 +1,12 @@
 let
     function f(x:int):int = x +1
+    function g(y:int, z:int, m:int, n:int):int =
+    let
+        function fz(y:int):int = y + z
+    in
+        fz(1)
+    end
 in
-    f(1)
+    g(1, 2, 3, 4);
+    f(2)
 end

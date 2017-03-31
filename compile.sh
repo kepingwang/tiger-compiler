@@ -1,6 +1,6 @@
 #!/bin/bash
 
-testlist=$(ls $1*.tig)
+testlist=$(ls $1)
 echo $testlist
 for file in $testlist;
 do
@@ -11,10 +11,10 @@ echo testing $file
 if test -z $2; then
     cat $file
     echo -----------------------------------------------
-    sed "s:\$1:$file:g" template.sml | sml | python3 outfilter.py
+    sed "s:\$1:$file:g" main_template.sml | sml | python3 outfilter.py
     ret=$?
 else
-    sed "s:\$1:$file:g" template.sml | sml | python3 outfilter.py
+    sed "s:\$1:$file:g" main_template.sml | sml | python3 outfilter.py
     ret=$?
 fi
 echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

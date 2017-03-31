@@ -8,8 +8,9 @@ sig
     (* semant.sml only knows about level, doesn't know about frame *)
     (* when calling Frame.newFrame, Translate passes static link as
      an extra escaped parameter. Frame.newFrame(label, true::formals) *)
-    parent: level,
-    formals: bool list
+      func_name: string,
+      parent: level,
+      formals: bool list
   } -> level
   val formals : level -> access list
   (* get the formals without the static link *)
@@ -59,13 +60,13 @@ fun getFrame (LEVEL {frame, ...}) = frame
   | getFrame (OUTERMOST {frame, ...}) = frame
 fun parentLevel (LEVEL {parent, ...}) = parent
   | parentLevel outerlevel = outerlevel
-fun newLevel {parent, formals} =
+fun newLevel {func_name, parent, formals} =
   (* pass static link as an extra element *)
   LEVEL {parent=parent,
-         frame=Frame.newFrame {name=Temp.newlabel(), formals=true::formals},
+         frame=Frame.newFrame {func_name = func_name, name=Temp.newlabel(), formals=true::formals},
          uniq=ref ()}
 fun levelName level = Frame.name (getFrame level)
-val outermost = OUTERMOST {frame=Frame.newFrame  {name = Temp.newlabel(), formals = [true] } }
+val outermost = OUTERMOST {frame=Frame.newFrame {func_name="main", name = Temp.newlabel(), formals = [true] } }
 structure A = Absyn
 type Aexp = A.oper
 structure T = Tree
@@ -306,11 +307,11 @@ fun ifThenElse (test, exp1, exp2) =
     in
         Ex (T.ESEQ (seq [
                          jump_stmt,
-                         T.LABEL tlb,
-                         T.MOVE (T.TEMP result ,t_branch_exp),
-                         T.JUMP (T.NAME join_lb, [join_lb]),
                          T.LABEL flb,
                          T.MOVE (T.TEMP result ,f_branch_exp),
+                         T.JUMP (T.NAME join_lb, [join_lb]),
+                         T.LABEL tlb,
+                         T.MOVE (T.TEMP result ,t_branch_exp),
                          T.LABEL join_lb
                      ],
                     T.TEMP result

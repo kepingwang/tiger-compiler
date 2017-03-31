@@ -472,7 +472,7 @@ and transDec (venv,tenv,level, A.FunctionDec(fundecs)) :
               val result_ty = case result of
                                   SOME(type_name, pos) => lookT (tenv, type_name, pos)
                                 | NONE => T.UNIT
-              val level' = Trans.newLevel {parent=level, formals=esc_list}
+              val level' = Trans.newLevel {func_name=(Symbol.name func_name), parent=level, formals=esc_list}
           in
               S.enter (venv, func_name, E.FunEntry {level=level', formals=formals_ty, result=result_ty})
           end

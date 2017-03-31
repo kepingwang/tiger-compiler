@@ -12,13 +12,17 @@ let val program =  "$1"
 	        val stms = Canon.linearize body
             val stms' = Canon.traceSchedule(Canon.basicBlocks stms)
         in
-            app (fn s => Printtree.printtree(TextIO.stdOut,s)) stms;
+            app (fn s => Printtree.printtree(TextIO.stdOut,s)) stms';
             print ("Assembly:\n");
             let
 	            val instrs =   List.concat(map (MipsGen.codegen frame) stms')
+                val instrs' = Frame.procEntryExit2 (frame, instrs)
+                val {prolog, body, epilog} = Frame.procEntryExit3 (frame, instrs')
                 val format0 = Assem.format(Frame.register_name)
             in
-                app (fn i => (TextIO.output(TextIO.stdOut, format0 i); print("\n"))) instrs
+                TextIO.output(TextIO.stdOut, prolog);
+                app (fn i => (TextIO.output(TextIO.stdOut, format0 i); print("\n"))) body;
+                TextIO.output(TextIO.stdOut, epilog)
             end;
             print("\n\n")
         end)
