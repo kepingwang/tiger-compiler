@@ -19,7 +19,10 @@ structure Main = struct
        val {prolog, body, epilog} = Frame.procEntryExit3 (frame, instrs')
        val format0 = Assem.format(Frame.register_name)
        val graph = MakeGraph.instrs2graph instrs'
-       fun nodeToString (nid, Flow.INS{id,...}) = (Int.toString nid) ^ (Int.toString id)
+       fun strTL templist =
+         foldl (fn (t, s) => s ^ " " ^ (Temp.makestring t)) "" templist
+       fun nodeToString (nid, Flow.INS{def, use, ismove}) =
+         (Int.toString nid) ^ ", def:" ^ (strTL def) ^ ", use:" ^ (strTL use)
        val () = G.printGraph nodeToString graph
    in
        TextIO.output(out, prolog);
