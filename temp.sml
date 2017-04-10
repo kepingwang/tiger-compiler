@@ -1,27 +1,47 @@
-(* make this an abstraction sometime *)
-(* TEMP is used to represent a value temporarily held in a register. *)
-(* Temps are abstract names for label variables. *)
-(* Labels are abstract names for static memory addresses. *)
 structure Temp : TEMP =
 struct
     type temp = int
+
+    val labelCount = ref 0
     val temps = ref 100
-    fun newtemp() = let val t = !temps in temps := t+1; t end
 
-    structure Table = IntMapTable(type key = int
-				  fun getInt n = n)
+    fun reset () = 
+	let val () = temps := 100
+	    val () = labelCount := 0
+	in
+	    ()
+	end
 
+    fun compare (temp1, temp2) =
+      Int.compare (temp1, temp2)
+      
+    fun newtemp () = 
+	let val t  = !temps 
+	    val () = temps := t+1
+	in 
+	    t
+	end
+      
     fun makestring t = "t" ^ Int.toString t
-
+		       
     type label = Symbol.symbol
+    
+    structure TempOrd =
+    struct 
+      type ord_key = temp
+      val compare = compare
+    end
 
-local structure F = Format
-      fun postinc x = let val i = !x in x := i+1; i end
-      val labs = ref 0
- in
-    fun newlabel() = Symbol.symbol(F.format "L%d" [F.INT(postinc labs)])
+    structure Set = SplaySetFn(TempOrd)
+    structure Map = SplayMapFn(TempOrd)
+                              
+    fun newlabel () = 
+	let val x  = !labelCount
+	    val () = labelCount := x +1
+	in
+	    Symbol.symbol (Format.format "L%d" [Format.INT x])
+	end
+      
     val namedlabel = Symbol.symbol
-end
-
 
 end
