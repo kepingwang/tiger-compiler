@@ -12,12 +12,11 @@ sig
   type 'a flowgraph
 end
 
+(* 1. liveness graph Node - remembering LiveIn[] LiveOut[] liveInTable(node, set) liveOutTable(node, set) *)
+(* 2. inference graph Node *)
 
 structure Flow : FLOW =
 struct
-structure Graph = FuncGraph(struct type ord_key = int
-                                   val compare = Int.compare
-                            end)
 datatype ins = INS of {
            def: Temp.temp list,
            use: Temp.temp list,
@@ -79,7 +78,7 @@ fun instrs2graph instrs =
     fun lookNid (table, lab) =
       case S.look (table, lab) of
           SOME(nid) => nid
-        | NONE => (raise LabelNotFound(lab); 0)
+        | NONE => raise LabelNotFound(lab)
                        
     fun procEdge (A.OPER{assem,dst,src,jump}, g) =
       let
