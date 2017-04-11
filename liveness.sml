@@ -1,4 +1,4 @@
-structure Liveness :
+structure Liveness : 
           sig
             structure Graph = FuncGraph(struct type ord_key = int
                                                val compare = Int.compare
