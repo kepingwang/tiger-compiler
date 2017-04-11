@@ -9,8 +9,7 @@ structure Liveness :
                        tnode: Temp.temp -> Temp.temp Graph.node,
                        moves: Temp.temp Graph.edge list
                      }
-            val interferenceGraph :
-                Flow.ins Flow.flowgraph -> igraph
+            val interferenceGraph : Flow.ins Flow.flowgraph -> igraph
                                              (* Return an igraph and a table mapping each flow-graph node *)
                                              (* to the set of temps that are live-out at that node. *)
                                              
@@ -53,7 +52,7 @@ fun initlgraph fgraph =
           fn (insNode, lgraph) =>
              let
                val {def,use,ismove} = Graph.nodeInfo insNode
-               val live = LIVE {defset=listToSet def, useset=listToSet use,
+               val live = LIVE {defset=listToSet def, useset=listToSet use, ismove=ismove
                                 liveIn=ref TSet.empty, liveOut=ref TSet.empty}
              in
                Graph.addNode (lgraph, Graph.getNodeID insNode, live)
@@ -80,7 +79,7 @@ fun updateLive lgraph = (* update one round *)
   let
     fun calcLive (liveNode, changed) =
       let
-        val {defset, useset, liveIn, liveOut} = Graph.nodeInfo liveNode
+        val {defset, useset, liveIn, liveOut, ...} = Graph.nodeInfo liveNode
         val liveInSetOld = !liveIn
         val liveOutSetOld = !liveOut
         val () = liveIn := TSet.union (useset, TSet.difference (!liveOut, defset))
@@ -116,6 +115,7 @@ fun createLiveGraph fgraph =
 datatype live = LIVE of {
            defset: TSet,
            useset: TSet,
+           ismove: bool,
            liveIn: TSet ref,
            liveOut: TSet ref
          }
@@ -145,7 +145,7 @@ fun createIGraphFromLGraph lgraph =
     val (igraph, tmap) = Graph.foldNodes (
           fn (lnode, (igraph, tmap)) =>
              let
-               val {defset,useset,liveIn,liveOut} = Graph.nodeInfo lnode
+               val {defset,useset,liveIn,liveOut,...} = Graph.nodeInfo lnode
                val (igraph, tmap) = TSet.foldl addTemp (igraph, tmap) defset
                val (igraph, tmap) = TSet.foldl addTemp (igraph, tmap) useset
              in
@@ -159,14 +159,22 @@ fun createIGraphFromLGraph lgraph =
           SOME(nid) => nid
         | NONE => raise TempNotFound
 
-    fun addIEdge (lnode, igraph) =
+    fun addIEdge (lnode, igraph, moveEdges) =
       let
-        val {defset,useset,liveIn,liveOut} = Graph.nodeInfo lnode
+        val {defset,useset,liveIn,liveOut,ismove} = Graph.nodeInfo lnode
         val igraph = TSet.foldl (
               fn (defTemp, igraph) =>
                  TSet.foldl (
                    fn (outTemp, igraph) =>
-                      Graph.doubleEdge (igraph, lookNid defTemp, lookNid outTemp)
+                      if ismove then
+                        let
+                          val (useTemp::_) = TSet.listItems useset
+                          val srcID = lookNid useTemp
+                          val dstID = lookNid defTemp
+                        in
+                          if (useTemp = outTemp) then (igraph, )
+                        end
+                      else Graph.doubleEdge (igraph, lookNid defTemp, lookNid outTemp)
                  ) igraph !liveOut
             ) igraph defset                                                 
       in
@@ -175,9 +183,24 @@ fun createIGraphFromLGraph lgraph =
         
     (* add edges *)
     val igraph = Graph.foldNodes addIEdge igraph lgraph
+
+    (* remember move edges *)
+    fun addMoveEdges (lnode, moveEdges) =
+      let
+        val {defset,useset,ismove,...} = Graph.nodeInfo lnode
+        val (defTemp::_) = TSet.listItems defset
+        val (useTemp::_) = TSet.listItems useset
+        val srcID = lookNid useTemp
+        val dstID = lookNid defTemp
+      in
+        if ismove then ({from=srcID, to=dstID}::moveEdges)
+        else moveEdges
+      end
+        
+    val moveEdges = Graph.foldNodes addMoveEdge [] lgraph
                                  
   in
-    (igraph, tmap)
+    (igraph, tmap, moveEdges)
   end
                      (* IGRAPH of { *)
                      (*   graph: Temp.temp Graph.graph, *)
@@ -189,13 +212,13 @@ fun createIGraphFromLGraph lgraph =
 fun interferenceGraph fgraph =
   let
     val lgraph = createLiveGraph fgraph
-    val (igraph, tmap) = createIGraphFromLGraph lgraph
+    val (igraph, tmap, moveEdges) = createIGraphFromLGraph lgraph
     fun lookNode temp = Graph.getNode (igraph, lookNid temp)
   in
     IGRAPH {
       graph=igraph,
       tnode=lookNode,
-      moves=[] (* TODO: list of move edges *)
+      moves=moveEdges
     }
   end
     
