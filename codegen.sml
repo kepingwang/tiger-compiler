@@ -55,6 +55,13 @@ fun codegen frame stm =
                     src=[],
                     jump=NONE
               })
+        | munchStm (T.MOVE (T.TEMP dst, T.NAME lab)) =
+          emit(A.OPER {
+                    assem="la `d0, " ^ (Symbol.name lab),
+                    dst=[dst],
+                    src=[],
+                    jump=NONE
+              })
         | munchStm (T.MOVE (T.TEMP dst, src_exp)) =
           emit(A.MOVE {
                     assem="move `d0, `s0",
@@ -377,7 +384,7 @@ fun codegen frame stm =
         | munchExp (T.NAME lab) =
           result ( fn(r) => emit(
                                A.OPER({
-                                         assem="li `d0, "^ (Symbol.name lab),
+                                         assem="la `d0, "^ (Symbol.name lab),
                                          src = [],
                                          dst = [r],
                                          jump=NONE
