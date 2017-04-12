@@ -1,4 +1,5 @@
 CM.make "sources.cm";
+structure G = Flow.Graph;
 structure Frame = MipsFrame;
 let val program =  "$1"
     val absyn_tree = Parse.parse program
@@ -26,6 +27,11 @@ let val program =  "$1"
                 let
                     val fgraph = MakeGraph.instrs2graph body
                     val igraph = Liveness.interferenceGraph fgraph
+                    fun strTL templist =
+                      foldl (fn (t, s) => s ^ " " ^ (Temp.makestring t)) "" templist
+                    fun nodeToString (nid, Flow.INS{def, use, ismove}) =
+                      (Int.toString nid) ^ ", def:" ^ (strTL def) ^ ", use:" ^ (strTL use) ^ ", move: " ^ (Bool.toString ismove)
+                    (* val () = G.printGraph nodeToString fgraph *)
                 in
                     Liveness.show igraph
                 end

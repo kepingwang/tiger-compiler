@@ -1,11 +1,13 @@
 Liveness analysis
 
 
-To compile a "test.tig" file into "test.s" file, call:
+To compile a "test.tig" file and print the assembly along with the inference graph:
+    Main.compile "test.tig";
 
-(include live_main.sml in sources.cm)
+To only print the assembly:
+    Main.assembly "test.tig"
 
-Main.compile "test.tig";
+To only print the inference graph:
+    Main.iGraph "test.tig"
 
 
-TODO: liveness.sml - remember to change the API to use Drew's graph.

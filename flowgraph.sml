@@ -74,7 +74,7 @@ fun instrs2graph instrs =
     val (graph, labelTable) = foldl procNode (G.empty, S.empty) instrs
     (* Ddd ending node in case the last instr has no successor *)
     (* NOTE: this might not be needed *)
-    val graph = G.addNode (graph, !nidCount, F.INS{def=[],use=[],ismove=false})
+    (* val graph = G.addNode (graph, !nidCount, F.INS{def=[],use=[],ismove=false}) *)
 
     val nidCount = ref 0
     exception LabelNotFound of T.label

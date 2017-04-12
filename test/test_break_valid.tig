@@ -1,6 +1,6 @@
 let
 in
     for i := 1 to 10 do (
-    while i < 5 do break;
+    while i < -5 do break;
     break)
 end

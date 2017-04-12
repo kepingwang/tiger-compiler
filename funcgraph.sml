@@ -134,5 +134,24 @@ fun printGraph stringify g =
     in
 	NodeMap.app prOneNode g
     end
-  
+fun printBiGraph stringify g = 
+  let fun println x = print(x ^" ")
+	  fun stringNid nid = 
+	    let val (_,data,_,_) = getNode(g,nid)
+	    in
+		    stringify(nid,data)
+	    end
+	  fun prSet s = NodeSet.app (println o stringNid) s
+	  fun prOneNode(nid,data,succs,preds) = 
+	    let val s = stringify(nid,data)
+		    val () = print(s)
+		    val () = print("<-->")
+		    val () = prSet (NodeSet.union (succs, preds))
+            val () = print("\n")
+	    in
+		    ()
+	    end
+  in
+	  NodeMap.app prOneNode g
+  end
 end

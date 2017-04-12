@@ -111,7 +111,7 @@ fun procEntryExit1 (frame, body) = body
 
 fun procEntryExit2 (frame, body_instr) =
     body_instr @ [Assem.OPER{
-                       assem="Dummy Instruction that use all special regs",
+                       assem="",
                        src=[ZERO, RA, SP] @ calleesaves,
                        dst=[],
                        jump=SOME[]}]
