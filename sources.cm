@@ -26,6 +26,7 @@ semant.sml
 funcgraph.sig
 funcgraph.sml
 flowgraph.sml
+liveness.sml
 live_main.sml
 $/smlnj-lib.cm
 $/ml-yacc-lib.cm

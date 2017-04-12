@@ -1,0 +1,14 @@
+let
+    var i := 1
+in
+    while i > 5 do 
+    (
+        for j:=1 to 10 do (
+            i := 41;
+            break; 
+            i := 42
+        );
+        break
+    )
+
+end

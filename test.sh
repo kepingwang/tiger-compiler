@@ -1,6 +1,6 @@
 #!/bin/bash
 
-testlist=$(ls $1*.tig)
+testlist=$(ls $1*)
 echo $testlist
 for file in $testlist;
 do

@@ -63,6 +63,11 @@ fun register_name t = if t = RV then "$v0"
                       else if t=RA then "$ra"
                       else if t=FP then "$fp"
                       else if t=SP then "$sp"
+                      else if t=ZERO then "$r0"
+                      else if t=List.nth (ARGS, 0) then "$a0"
+                      else if t=List.nth (ARGS, 1) then "$a1"
+                      else if t=List.nth (ARGS, 2) then "$a2"
+                      else if t=List.nth (ARGS, 3) then "$a3"
                       else Temp.makestring t
 val wordSize = 4 (* ? *)
 fun func_name {func_name, name, formals, stack_local_count} = func_name
@@ -106,7 +111,7 @@ fun procEntryExit1 (frame, body) = body
 
 fun procEntryExit2 (frame, body_instr) =
     body_instr @ [Assem.OPER{
-                       assem="",
+                       assem="Dummy Instruction that use all special regs",
                        src=[ZERO, RA, SP] @ calleesaves,
                        dst=[],
                        jump=SOME[]}]

@@ -22,7 +22,13 @@ let val program =  "$1"
             in
                 TextIO.output(TextIO.stdOut, prolog);
                 app (fn i => (TextIO.output(TextIO.stdOut, format0 i); print("\n"))) body;
-                TextIO.output(TextIO.stdOut, epilog)
+                TextIO.output(TextIO.stdOut, epilog);
+                let
+                    val fgraph = MakeGraph.instrs2graph body
+                    val igraph = Liveness.interferenceGraph fgraph
+                in
+                    Liveness.show igraph
+                end
             end;
             print("\n\n")
         end)

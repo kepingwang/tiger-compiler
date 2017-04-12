@@ -112,8 +112,9 @@ fun unNx (Ex e) = T.EXP e
 (*Nx case will never occur.
  *We can improve the following by consider unCx(CONST 0/1)
  *)
+exception Impossible
 fun unCx (Ex e) = (fn (t_label, f_label) => T.CJUMP (T.NE, e, T.CONST 0, t_label, f_label))
-  | unCx (Nx s) = (fn (t_label, f_label) => seq [s, T.JUMP (T.NAME f_label, [f_label])])
+  | unCx (Nx s) = (fn (t_label, f_label) => raise Impossible)
   | unCx (Cx c) = c
 
 val fragList : frag list ref = ref []
@@ -331,6 +332,7 @@ fun whileExp (test, body, done_lb) =
       Nx (seq [
                T.LABEL start_lb,
                jump_stmt,
+               T.LABEL cont_lb,
                body_stmt,
                T.JUMP (T.NAME start_lb, [start_lb]),
                T.LABEL done_lb
@@ -353,6 +355,7 @@ fun forExp (i_exp, lo, hi, body, done_lb) =
                T.MOVE (T.TEMP limit, unEx hi),
                T.LABEL start_lb,
                jump_stmt,
+               T.LABEL cont_lb,
                body_stmt,
                inc_stmt,
                T.JUMP (T.NAME start_lb, [start_lb]),

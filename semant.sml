@@ -323,7 +323,7 @@ fun transExp (venv:venv, tenv:tenv, level:Trans.level, break_dest:Trans.exp) =
                   checkUnit(body_ty, pos);
                   if has_error ()
                   then {exp=Trans.errorExp (), ty=T.UNIT}
-                  else {exp=Trans.forExp(i_var_exp, lo_exp, hi_exp, body_exp, break_dest), ty=T.UNIT}
+                  else {exp=Trans.forExp(i_var_exp, lo_exp, hi_exp, body_exp, break_dest_new), ty=T.UNIT}
               end
           end
         | trexp (A.BreakExp(pos)) = (

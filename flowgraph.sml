@@ -17,6 +17,10 @@ end
 
 structure Flow : FLOW =
 struct
+structure Graph = FuncGraph (struct type ord_key = int
+                                    val compare = Int.compare
+                             end
+                            )
 datatype ins = INS of {
            def: Temp.temp list,
            use: Temp.temp list,
@@ -73,13 +77,11 @@ fun instrs2graph instrs =
     val graph = G.addNode (graph, !nidCount, F.INS{def=[],use=[],ismove=false})
 
     val nidCount = ref 0
-                       
     exception LabelNotFound of T.label
     fun lookNid (table, lab) =
       case S.look (table, lab) of
           SOME(nid) => nid
-        | NONE => raise LabelNotFound(lab)
-                       
+        | NONE => (print (Symbol.name lab) ;raise LabelNotFound(lab))
     fun procEdge (A.OPER{assem,dst,src,jump}, g) =
       let
         val nid = !nidCount
