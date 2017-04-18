@@ -2,6 +2,7 @@ signature FRAME =
 sig
   type frame
   type access
+  type register = string
   datatype frag = PROC of {body: Tree.stm, frame: frame}
 		        | STRING of Temp.label * string
   val newFrame: {func_name:string,
@@ -21,6 +22,9 @@ sig
   val ARGS : Temp.temp list
   val callersaves : Temp.temp list
   val calleesaves : Temp.temp list
+
+  val tempMap : Frame.register Temp.Map.map
+  val registers: register list
 
   val procEntryExit1 : frame * Tree.stm -> Tree.stm
   val procEntryExit2 : frame * Assem.instr list -> Assem.instr list
@@ -57,6 +61,7 @@ val RA = Temp.newtemp()
 val FP = Temp.newtemp() (* frame pointer *)
 val SP = Temp.newtemp() (* frame pointer *)
 val ARGS = [Temp.newtemp(), Temp.newtemp(), Temp.newtemp(), Temp.newtemp()]
+val registers: register list
 val callersaves = []
 val calleesaves = []
 fun register_name t = if t = RV then "$v0"
