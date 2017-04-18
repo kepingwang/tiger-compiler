@@ -65,6 +65,17 @@ fun color (IGRAPH{graph, tnode, moves}, initial, spillCost, regs) =
         in
             List.rev (removeNode graph)
         end
+      fun selectColor((graph, nid)::graph_list, colorAlloc) =
+        let
+            structure RegMap = SplayMapFn()
+            val colorUsedFlag = foldl (fn (reg, map) => RegMap.insert (map, reg, false)) RegMap.empty regs
+            fun findColor (graph, nid, colorAlloc) =
+              let
+                  fun markColor
+              in
+              end
+        in
+        end
   in
   end
 end
