@@ -28,6 +28,8 @@ funcgraph.sml
 flowgraph.sml
 liveness.sml
 live_main.sml
+color.sml
+reg.sml
 $/smlnj-lib.cm
 $/ml-yacc-lib.cm
 $/basis.cm

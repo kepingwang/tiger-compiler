@@ -56,14 +56,72 @@ type frame = {func_name:string,
 datatype frag = PROC of {body: Tree.stm, frame: frame}
 		      | STRING of Temp.label * string
 val ZERO = Temp.newtemp()
+val AT = Temp.newtemp()
 val RV = Temp.newtemp()
-val RA = Temp.newtemp()
-val FP = Temp.newtemp() (* frame pointer *)
-val SP = Temp.newtemp() (* frame pointer *)
+val v1 = Temp.newtemp()
 val ARGS = [Temp.newtemp(), Temp.newtemp(), Temp.newtemp(), Temp.newtemp()]
-val registers: register list
-val callersaves = []
-val calleesaves = []
+val tRegs = [Temp.newtemp(), Temp.newtemp(), Temp.newtemp(), Temp.newtemp(),
+             Temp.newtemp(), Temp.newtemp(), Temp.newtemp(), Temp.newtemp()]
+val sRegs = [Temp.newtemp(), Temp.newtemp(), Temp.newtemp(), Temp.newtemp(),
+             Temp.newtemp(), Temp.newtemp(), Temp.newtemp(), Temp.newtemp()]
+val t8 = Temp.newtemp()
+val t9 = Temp.newtemp()
+val k0 = Temp.newtemp()
+val k1 = Temp.newtemp()
+val GP = Temp.newtemp()
+val SP = Temp.newtemp() 
+val FP = Temp.newtemp() 
+val RA = Temp.newtemp()
+
+val specialRegs = [
+  ZERO, AT, RV, SP, FP, RA
+]
+val ARGS = ARGS
+val callersaves = tRegs @ [v1, t8, t9, k0, k1, GP]
+val calleesaves = sRegs
+                     
+structure TMap = Temp.Map
+val tempMap = TMap.empty
+val tempMap = TMap.insert (tempMap, ZERO, "zero")
+val tempMap = TMap.insert (tempMap, AT, "at")
+val tempMap = TMap.insert (tempMap, RV, "v0")
+val tempMap = TMap.insert (tempMap, v1, "v1")
+val tempMap = foldl (fn (temp, (map, num)) =>
+                        (TMap.insert(tempMap, temp, "a"^(Int.toString num)), num+1))
+                    (tempMap, 0)
+                    ARGS                    
+val tempMap = foldl (fn (temp, (map, num)) =>
+                        (TMap.insert(tempMap, temp, "t"^(Int.toString num)), num+1))
+                    (tempMap, 0)
+                    tRegs
+val tempMap = foldl (fn (temp, (map, num)) =>
+                        (TMap.insert(tempMap, temp, "s"^(Int.toString num)), num+1))
+                    (tempMap, 0)
+                    sRegs
+val tempMap = TMap.insert (tempMap, t8, "t8")
+val tempMap = TMap.insert (tempMap, t9, "t9")
+val tempMap = TMap.insert (tempMap, k0, "k0")
+val tempMap = TMap.insert (tempMap, k1, "k1")
+val tempMap = TMap.insert (tempMap, GP, "gp")
+val tempMap = TMap.insert (tempMap, SP, "sp")
+val tempMap = TMap.insert (tempMap, FP, "fp")                          
+val tempMap = TMap.insert (tempMap, RA, "ra")
+
+
+
+                          
+(* registers not used: zero, at *)                    
+val registers = ["v0", "v1", (* return values *)
+                 "a0", "a1", "a2", "a3", (* function parameters *)
+                 "t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7", (* callersave *)
+                 "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", (* calleesave, function variables *)
+                 "t8", "t9", (* two more temporary variables *)
+                 "k0", "k1", (* kernel use variables, may change unexpectedly *)
+                 "gp", (* global pointer *)
+                 "sp", (* stack pointer *)
+                 "fp", (* frame pointer or subroutine variable? x*)
+                 "ra", (* return address of the last subroutine call *)
+                ]
 fun register_name t = if t = RV then "$v0"
                       else if t=RA then "$ra"
                       else if t=FP then "$fp"

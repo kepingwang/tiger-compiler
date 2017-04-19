@@ -128,9 +128,13 @@ structure Main = struct
                    val instrs' = Frame.procEntryExit2 (frame, instrs)
                    val {prolog, body, epilog} = Frame.procEntryExit3 (frame, instrs')
                    val format0 = Assem.format(Frame.register_name)
+                   val (body', allocation) = RegAlloc.alloc (body, Frame.frame)
+                   fun tempName temp =
+                     "$" ^ (Option.valOf (Temp.Map.find (allocation, tempf)))
+                   val format1 = Assem.format(tempName)
                in
                    TextIO.output(TextIO.stdOut, prolog);
-                   app (fn i => (TextIO.output(TextIO.stdOut, format0 i); print("\n"))) body;
+                   app (fn i => (TextIO.output(TextIO.stdOut, format1 i); print("\n"))) body;
                    TextIO.output(TextIO.stdOut, epilog)
                end;
                print("\n\n")
