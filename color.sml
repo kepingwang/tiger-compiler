@@ -111,5 +111,6 @@ fun color (IGRAPH{graph, tnode, moves}, initial, spillCost, regs) =
               )
         )
   in
+      colorGraph graph
   end
 end
