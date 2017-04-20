@@ -275,6 +275,24 @@ fun codegen frame stm =
                               jump=NONE
                         })
                 )
+        | munchExp (T.BINOP (T.PLUS, exp1, T.CONST const)) =
+          result(fn (r)=> 
+                    emit(A.OPER{
+                              assem="addi `d0, `s0, " ^(Int.toString const),
+                              src=[munchExp exp1],
+                              dst=[r],
+                              jump=NONE
+                        })
+                )
+        | munchExp (T.BINOP (T.PLUS, T.CONST const, exp1)) =
+          result(fn (r)=> 
+                    emit(A.OPER{
+                              assem="addi `d0, `s0, " ^(Int.toString const),
+                              src=[munchExp exp1],
+                              dst=[r],
+                              jump=NONE
+                        })
+                )
         | munchExp (T.BINOP (T.PLUS, exp1, exp2)) =
           result(fn (r)=> 
                     emit(A.OPER{

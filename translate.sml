@@ -181,12 +181,16 @@ fun record field_exps =
       val n = List.length field_exps
       val r = Temp.newtemp()
       val (init_seq, _) = foldl (fn (exp, (s_list, offset)) => (
-                                    unNx (assign ((Ex (Tree.MEM
-                                                           (T.BINOP
-                                                                (T.PLUS, T.TEMP r, T.CONST (offset * Frame.wordSize)
-                                                                )
-                                                           ))
-                                                       ),
+                                     unNx (assign ((Ex (Tree.MEM
+                                                            (if offset = 0 then
+                                                                T.TEMP r
+                                                            else
+                                                                T.BINOP
+                                                                    (T.PLUS, T.TEMP r, T.CONST (offset * Frame.wordSize)
+                                                                    )
+                                                            )
+                                                       )
+                                                   ),
                                                        exp
                                                       )
                                          ) :: s_list, offset + 1
@@ -196,7 +200,12 @@ fun record field_exps =
       Ex (Tree.ESEQ (seq all_seq, T.TEMP r))
   end
 
-fun recordField (var_exp, offset) = Ex (T.MEM (T.BINOP (T.PLUS, unEx var_exp, T.CONST (offset * Frame.wordSize))))
+fun recordField (var_exp, offset) = Ex (T.MEM (
+                                             if offset = 0 then
+                                                 unEx var_exp
+                                             else
+                                                 T.BINOP (T.PLUS, unEx var_exp, T.CONST (offset * Frame.wordSize)))
+                                       )
 
 fun breakExp done_lb =
   let
@@ -247,7 +256,9 @@ fun arraySubscript (var_exp, index_exp) =
 
 structure A = Absyn
 
-fun binop (A_oper, left_exp, right_exp) =
+fun binop (A.PlusOp, Ex(T.CONST 0), right_exp) = Ex ( unEx right_exp)
+  | binop (A.PlusOp, left_exp, Ex(T.CONST 0)) = Ex (unEx left_exp)
+  | binop (A_oper, left_exp, right_exp) =
   let
       val left_exp = unEx left_exp
       val right_exp = unEx right_exp
