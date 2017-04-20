@@ -21,7 +21,7 @@ echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 echo
 echo
 if test $ret -ne 0; then
-    echo testing aborted due to a failed test.
+    echo testing aborted due to $file test.
     break
 fi
 done

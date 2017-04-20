@@ -68,13 +68,6 @@ fun codegen frame stm =
                     dst=dst,
                     src=munchExp src_exp
               })
-        | munchStm (T.MOVE (T.MEM (T.TEMP dst_addr), T.TEMP src_val)) =
-          emit(A.OPER{
-                    assem="sw `s0, 0(`s1)",
-                    dst=[],
-                    src=[src_val, dst_addr],
-                    jump = NONE
-              })
         | munchStm (T.MOVE (
                          T.MEM (
                              T.BINOP(T.PLUS, T.TEMP base_addr, T.CONST offset)),
@@ -83,6 +76,30 @@ fun codegen frame stm =
                     assem="sw `s0, " ^(Int.toString offset) ^"(`s1)",
                     dst=[],
                     src=[src_val, base_addr],
+                    jump = NONE
+              })
+        | munchStm (T.MOVE (
+                         T.MEM (
+                             T.BINOP(T.PLUS, T.TEMP base_addr, T.CONST offset)),
+                         src_exp)) =
+          emit(A.OPER{
+                    assem="sw `s0, " ^(Int.toString offset) ^"(`s1)",
+                    dst=[],
+                    src=[munchExp src_exp, base_addr],
+                    jump = NONE
+              })
+        | munchStm (T.MOVE (T.MEM (T.TEMP dst_addr), T.TEMP src_val)) =
+          emit(A.OPER{
+                    assem="sw `s0, 0(`s1)",
+                    dst=[],
+                    src=[src_val, dst_addr],
+                    jump = NONE
+              })
+        | munchStm (T.MOVE (T.MEM (T.TEMP dst_addr), src_exp)) =
+          emit(A.OPER{
+                    assem="sw `s0, 0(`s1)",
+                    dst=[],
+                    src=[munchExp src_exp, dst_addr],
                     jump = NONE
               })
         | munchStm (T.MOVE (T.MEM addr_exp, T.TEMP src_val)) =
@@ -315,7 +332,7 @@ fun codegen frame stm =
                         })
                 )
         | munchExp (T.BINOP (T.DIV, exp1, exp2)) =
-          result(fn (r)=> 
+          result(fn (r)=>
                     emit(A.OPER{
                               assem="div `d0, `s0, `s1",
                               src=[munchExp exp1, munchExp exp2],
@@ -323,6 +340,24 @@ fun codegen frame stm =
                               jump=NONE
                         })
                 )
+        | munchExp (T.MEM (T.BINOP(T.PLUS, T.TEMP src, T.CONST offset))) =
+          result (fn (r)=>
+                     emit(A.OPER{
+                               assem="lw `d0, "^(Int.toString offset)^"(`s0)",
+                               src=[src],
+                               dst=[r],
+                               jump=NONE
+                         })
+                 )
+        | munchExp (T.MEM (T.BINOP(T.PLUS, src_exp, T.CONST offset))) =
+          result (fn (r)=>
+                     emit(A.OPER{
+                               assem="lw `d0, "^(Int.toString offset)^"(`s0)",
+                               src=[munchExp src_exp],
+                               dst=[r],
+                               jump=NONE
+                         })
+                 )
         | munchExp (T.MEM (T.TEMP addr)) =
           result (fn (r)=>
                      emit(A.OPER{
