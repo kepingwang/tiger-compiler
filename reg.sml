@@ -25,8 +25,8 @@ fun alloc (assems, frame) =
         }
     (* TODO: if spill, change assems *)
     val () = case List.length spillList of
-                 0 => raise Spill
-               | _ => ()
+                 0 => ()
+               | _ => raise Spill
   in
     (assems, allocation)
   end

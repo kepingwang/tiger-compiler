@@ -1,4 +1,5 @@
 CM.make "sources.cm";
+SMLofNJ.Internals.TDP.mode := true;
 structure G = Flow.Graph;
 structure Frame = MipsFrame;
 let val program =  "$1"
@@ -19,10 +20,17 @@ let val program =  "$1"
 	            val instrs =   List.concat(map (MipsGen.codegen frame) stms')
                 val instrs' = Frame.procEntryExit2 (frame, instrs)
                 val {prolog, body, epilog} = Frame.procEntryExit3 (frame, instrs')
+                val (body', allocation) = RegAlloc.alloc (body, frame)
+                fun tempName temp =
+                  "$" ^ (Option.valOf (Temp.Map.find (allocation, temp)))
+                val format1 = Assem.format(tempName)
                 val format0 = Assem.format(Frame.register_name)
+
             in
                 TextIO.output(TextIO.stdOut, prolog);
                 app (fn i => (TextIO.output(TextIO.stdOut, format0 i); print("\n"))) body;
+                print("colored:\n");
+                app (fn i => (TextIO.output(TextIO.stdOut, format1 i); print("\n"))) body;
                 TextIO.output(TextIO.stdOut, epilog);
                 let
                     val fgraph = MakeGraph.instrs2graph body

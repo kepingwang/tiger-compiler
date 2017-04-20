@@ -23,7 +23,7 @@ sig
   val callersaves : Temp.temp list
   val calleesaves : Temp.temp list
 
-  val tempMap : Frame.register Temp.Map.map
+  val tempMap : register Temp.Map.map
   val registers: register list
 
   val procEntryExit1 : frame * Tree.stm -> Tree.stm
@@ -42,6 +42,7 @@ struct
 
 datatype access = InFrame of int |
 		          InReg of Temp.temp
+type register = string
 
 (* formals are function parameters *)
 (* frame is a data structure holding: *)
@@ -69,8 +70,8 @@ val t9 = Temp.newtemp()
 val k0 = Temp.newtemp()
 val k1 = Temp.newtemp()
 val GP = Temp.newtemp()
-val SP = Temp.newtemp() 
-val FP = Temp.newtemp() 
+val SP = Temp.newtemp()
+val FP = Temp.newtemp()
 val RA = Temp.newtemp()
 
 val specialRegs = [
@@ -79,23 +80,23 @@ val specialRegs = [
 val ARGS = ARGS
 val callersaves = tRegs @ [v1, t8, t9, k0, k1, GP]
 val calleesaves = sRegs
-                     
+
 structure TMap = Temp.Map
 val tempMap = TMap.empty
 val tempMap = TMap.insert (tempMap, ZERO, "zero")
 val tempMap = TMap.insert (tempMap, AT, "at")
 val tempMap = TMap.insert (tempMap, RV, "v0")
 val tempMap = TMap.insert (tempMap, v1, "v1")
-val tempMap = foldl (fn (temp, (map, num)) =>
-                        (TMap.insert(tempMap, temp, "a"^(Int.toString num)), num+1))
+val (tempMap, _) = foldl (fn (temp, (map, num)) =>
+                        (TMap.insert(map, temp, "a"^(Int.toString num)), num+1))
                     (tempMap, 0)
-                    ARGS                    
-val tempMap = foldl (fn (temp, (map, num)) =>
-                        (TMap.insert(tempMap, temp, "t"^(Int.toString num)), num+1))
+                    ARGS
+val (tempMap, _) = foldl (fn (temp, (map, num)) =>
+                        (TMap.insert (map, temp, "t"^(Int.toString num)), num+1))
                     (tempMap, 0)
                     tRegs
-val tempMap = foldl (fn (temp, (map, num)) =>
-                        (TMap.insert(tempMap, temp, "s"^(Int.toString num)), num+1))
+val (tempMap, _) = foldl (fn (temp, (map, num)) =>
+                        (TMap.insert(map, temp, "s"^(Int.toString num)), num+1))
                     (tempMap, 0)
                     sRegs
 val tempMap = TMap.insert (tempMap, t8, "t8")
@@ -104,14 +105,15 @@ val tempMap = TMap.insert (tempMap, k0, "k0")
 val tempMap = TMap.insert (tempMap, k1, "k1")
 val tempMap = TMap.insert (tempMap, GP, "gp")
 val tempMap = TMap.insert (tempMap, SP, "sp")
-val tempMap = TMap.insert (tempMap, FP, "fp")                          
+val tempMap = TMap.insert (tempMap, FP, "fp")
 val tempMap = TMap.insert (tempMap, RA, "ra")
 
 
 
-                          
-(* registers not used: zero, at *)                    
-val registers = ["v0", "v1", (* return values *)
+
+(* registers not used: zero, at *)
+val registers = [ "zero",
+                  "v0", "v1", (* return values *)
                  "a0", "a1", "a2", "a3", (* function parameters *)
                  "t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7", (* callersave *)
                  "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", (* calleesave, function variables *)
@@ -120,7 +122,7 @@ val registers = ["v0", "v1", (* return values *)
                  "gp", (* global pointer *)
                  "sp", (* stack pointer *)
                  "fp", (* frame pointer or subroutine variable? x*)
-                 "ra", (* return address of the last subroutine call *)
+                 "ra" (* return address of the last subroutine call *)
                 ]
 fun register_name t = if t = RV then "$v0"
                       else if t=RA then "$ra"

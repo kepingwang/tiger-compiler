@@ -33,4 +33,5 @@ reg.sml
 $/smlnj-lib.cm
 $/ml-yacc-lib.cm
 $/basis.cm
+$smlnj-tdp/back-trace.cm
 

@@ -1,0 +1,6 @@
+let
+    var y := 3
+    function f(x:int):int = x + y
+in
+    f(2)
+end 

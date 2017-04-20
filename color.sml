@@ -1,10 +1,11 @@
 signature COLOR =
 sig
     structure Frame : FRAME
+    structure Graph : FUNCGRAPH
     type allocation = Frame.register Temp.Map.map
     val color: {interference: Liveness.igraph,
                 initial: allocation,
-                spillCost: Graph.node -> int,
+                spillCost: 'a Graph.node -> int,
                 registers: Frame.register list}
                -> allocation * Temp.temp list
 end
@@ -16,9 +17,19 @@ type allocation = Frame.register Temp.Map.map
 structure Graph = Flow.Graph
 structure TSet = Temp.Set
 structure TMap = Temp.Map
-structure ColorSet = SplaySetFn(Frame.register)
-fun color (IGRAPH{graph, tnode, moves}, initial, spillCost, regs) =
+structure ColorSet = SplaySetFn (struct type ord_key = Frame.register
+                                         val compare = String.compare
+                                  end
+                                 )
+fun color {interference=Liveness.IGRAPH{graph, tnode, moves}, initial, spillCost , registers=regs}=
   let
+      val graph = foldl (fn (e, g)=>
+                            let
+                                val {from, to} = e
+                            in
+                                Graph.doubleEdge (g, from, to)
+                            end
+                        ) graph moves
       val k = List.length regs
       fun isPrecolored temp = (case Temp.Map.find (initial, temp) of
                                    SOME(_) => true
@@ -27,7 +38,7 @@ fun color (IGRAPH{graph, tnode, moves}, initial, spillCost, regs) =
       fun removeLowDegNode graph =
         let
             fun findFirst [] = NONE
-              | findFirst node::nodelist =
+              | findFirst (node::nodelist) =
                 let
                     val temp = Graph.nodeInfo node
                     val degree = Graph.outDegree node
@@ -48,7 +59,7 @@ fun color (IGRAPH{graph, tnode, moves}, initial, spillCost, regs) =
       fun spillNode graph =
         let
             fun findFirst [] = NONE
-              | findFirst node::nodelist =
+              | findFirst (node::nodelist) =
                 let
                     val temp = Graph.nodeInfo node
                 in
@@ -73,7 +84,9 @@ fun color (IGRAPH{graph, tnode, moves}, initial, spillCost, regs) =
                   val temp = Graph.nodeInfo node
               in
                   case TMap.find (color_alloc, temp) of
-                      SOME(color) => ColorSet.delete (color_set, color)
+                      SOME(color) => ((ColorSet.delete (color_set, color))
+                                      handle x => (print ("deleting: " ^ color ^ "\n"); color_set)
+                                     )
                     | NONE => color_set  (*This node is not colored, a spill node*)
               end
             val avail_color_set = Graph.foldSuccs' graph deleteUsedColor available_color (Graph.getNode (graph, nid))
