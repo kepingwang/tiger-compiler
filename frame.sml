@@ -34,6 +34,7 @@ sig
   val externalCall: string * Tree.exp list -> Tree.exp
   (* more...  *)
   val register_name: Temp.temp -> string
+  val string : Temp.label * string -> string
 end
 
 
@@ -127,7 +128,6 @@ fun exp access exp =
       InFrame(0) => Tree.MEM(exp)
     | InFrame(k) => Tree.MEM(Tree.BINOP(Tree.PLUS, exp, Tree.CONST(k)))
     | InReg(tempReg) => Tree.TEMP(tempReg)
-fun procEntryExit1 (frame , body) = body
 
 fun allocLocalImpl stack_local_count true =
   let
@@ -158,7 +158,56 @@ fun allocLocal {name, formals, stack_local_count, func_name} esc = allocLocalImp
 
 fun externalCall (name, param_list) = Tree.CALL(Tree.NAME(Temp.namedlabel(name)), param_list)
 
-fun procEntryExit1 (frame, body) = body
+fun string  (label, str) = ".data\n" ^(Symbol.name label) ^ ":\n .asciiz \"" ^ str ^"\"\n"
+structure T = Tree
+fun procEntryExit1 (frame , body) =
+  let
+      val {name, formals, stack_local_count, func_name} = frame
+      fun setupParam (access, (stmt,n)) =
+        if n < 4 then
+            (case access of
+                 InReg t => (T.SEQ(
+                                  T.MOVE (T.TEMP t,
+                                          T.TEMP (List.nth (ARGS, n))
+                                         )
+                                 ,stmt)
+                            , n+1)
+               | InFrame (k) => (T.SEQ(
+                                      (T.MOVE(T.MEM(T.BINOP(T.PLUS, T.TEMP FP, T.CONST k)),
+                                              T.TEMP(List.nth (ARGS, n))
+                                             )
+                                      ), stmt)
+                                , n+1)
+            )
+        else
+            (case access of
+                 InReg t => (T.SEQ(
+                                  T.MOVE (T.TEMP t,
+                                          T.MEM(T.BINOP(T.PLUS, T.TEMP FP, T.CONST (n*wordSize) ))
+                                         ),
+                                  stmt
+                              )
+                            , n+1)
+               | InFrame(k) => (stmt, n+1)
+            )
+      val (body, _) = foldl setupParam (body, 0) formals
+
+      fun saveLoadReg (temp, stmt) =
+        let
+            val access = allocLocal frame true
+            val location_exp = exp access (T.TEMP FP)
+        in
+            T.SEQ(
+                T.SEQ(
+                    T.MOVE(location_exp, T.TEMP(temp)),
+                    stmt),
+                T.MOVE(T.TEMP(temp), location_exp)
+            )
+        end
+      val body = foldl saveLoadReg body calleesaves
+  in
+      body
+  end
 
 fun procEntryExit2 (frame, body_instr) =
     body_instr @ [Assem.OPER{
@@ -167,8 +216,8 @@ fun procEntryExit2 (frame, body_instr) =
                        dst=[],
                        jump=SOME[]}]
 fun procEntryExit3 ({func_name, name, formals, stack_local_count}, body_instr) = {
-    prolog = "Procedure " ^ func_name ^ "\n",
+    prolog = ".text\n# Procedure " ^ func_name ^ "\n",
     body = Assem.LABEL {assem=(Symbol.name name)^":", lab=name}:: body_instr,
-    epilog = "End " ^ func_name ^ "\n"
+    epilog = "# End " ^ func_name ^ "\n"
 }
 end

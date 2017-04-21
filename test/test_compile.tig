@@ -1,0 +1,5 @@
+let
+    var x := "hello"
+in
+    x 
+end

@@ -1,0 +1,10 @@
+let
+    function parent(a:int, b:int, c:int, d:int, e:int):int = 
+    let
+        function child(x:int):int = x + c +d
+    in
+        child (6)
+    end 
+in
+    parent(1,2,3,4,5)
+end

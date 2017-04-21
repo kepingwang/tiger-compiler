@@ -85,7 +85,8 @@ fun color {interference=Liveness.IGRAPH{graph, tnode, moves}, initial, spillCost
               in
                   case TMap.find (color_alloc, temp) of
                       SOME(color) => ((ColorSet.delete (color_set, color))
-                                      handle x => (print ("deleting: " ^ color ^ "\n"); color_set)
+                                      handle x => (
+                                                   color_set)
                                      )
                     | NONE => color_set  (*This node is not colored, a spill node*)
               end
