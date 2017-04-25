@@ -43,5 +43,5 @@ struct
 	end
       
     val namedlabel = Symbol.symbol
-
+    val mainlabel = Symbol.symbol "main"
 end

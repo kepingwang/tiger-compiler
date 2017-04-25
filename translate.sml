@@ -66,7 +66,7 @@ fun newLevel {func_name, parent, formals} =
          frame=Frame.newFrame {func_name = func_name, name=Temp.newlabel(), formals=true::formals},
          uniq=ref ()}
 fun levelName level = Frame.name (getFrame level)
-val outermost = OUTERMOST {frame=Frame.newFrame {func_name="main", name = Temp.newlabel(), formals = [true] } }
+val outermost = OUTERMOST {frame=Frame.newFrame {func_name="main", name = Temp.mainlabel, formals = [true] } }
 structure A = Absyn
 type Aexp = A.oper
 structure T = Tree
