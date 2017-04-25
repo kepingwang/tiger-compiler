@@ -12,6 +12,8 @@ structure A = Assem
 structure T = Tree
 val calldefs= Frame.callersaves @ [Frame.RV, Frame.RA]
 exception Unmatched
+fun int2string num = if num >= 0 then (Int.toString num)
+                     else ("-" ^ (Int.toString (~num)))
 fun codegen frame stm =
   let
       val assem_list : A.instr list ref = ref nil
@@ -22,7 +24,7 @@ fun codegen frame stm =
         | munchStm (T.MOVE (T.TEMP dst,
                             T.MEM (T.BINOP(T.PLUS, T.TEMP src, T.CONST offset)))) =
           emit(A.OPER {
-                    assem="lw `d0, " ^ (Int.toString offset) ^ "(`s0)",
+                    assem="lw `d0, " ^ (int2string offset) ^ "(`s0)",
                     dst=[dst],
                     src=[src],
                     jump=NONE
@@ -30,7 +32,7 @@ fun codegen frame stm =
         | munchStm (T.MOVE (T.TEMP dst,
                             T.MEM (T.BINOP(T.PLUS, T.CONST offset, T.TEMP src)))) =
           emit(A.OPER {
-                    assem="lw `d0, " ^ (Int.toString offset) ^ "(`s0)",
+                    assem="lw `d0, " ^ (int2string offset) ^ "(`s0)",
                     dst=[dst],
                     src=[src],
                     jump=NONE
@@ -50,7 +52,7 @@ fun codegen frame stm =
               })
         | munchStm (T.MOVE (T.TEMP dst, T.CONST c)) =
           emit(A.OPER {
-                    assem="li `d0, " ^ (Int.toString c),
+                    assem="li `d0, " ^ (int2string c),
                     dst=[dst],
                     src=[],
                     jump=NONE
@@ -73,7 +75,7 @@ fun codegen frame stm =
                              T.BINOP(T.PLUS, T.TEMP base_addr, T.CONST offset)),
                          T.TEMP src_val)) =
           emit(A.OPER{
-                    assem="sw `s0, " ^(Int.toString offset) ^"(`s1)",
+                    assem="sw `s0, " ^(int2string offset) ^"(`s1)",
                     dst=[],
                     src=[src_val, base_addr],
                     jump = NONE
@@ -83,7 +85,7 @@ fun codegen frame stm =
                              T.BINOP(T.PLUS, T.TEMP base_addr, T.CONST offset)),
                          src_exp)) =
           emit(A.OPER{
-                    assem="sw `s0, " ^(Int.toString offset) ^"(`s1)",
+                    assem="sw `s0, " ^(int2string offset) ^"(`s1)",
                     dst=[],
                     src=[munchExp src_exp, base_addr],
                     jump = NONE
@@ -233,7 +235,7 @@ fun codegen frame stm =
           if n < 4
           then (
               emit(A.OPER{
-                        assem="move $a"^(Int.toString n) ^", `s0",
+                        assem="move $a"^(int2string n) ^", `s0",
                         src=[munchExp arg_exp],
                         dst=[List.nth (Frame.ARGS, n)],
                         jump=NONE
@@ -241,7 +243,7 @@ fun codegen frame stm =
               (List.nth (Frame.ARGS, n))::munchArgs(n+1, l)
           ) else (
               emit(A.OPER{
-                        assem="sw `s0, " ^(Int.toString (Frame.wordSize * n)) ^"($sp)",
+                        assem="sw `s0, " ^(int2string (Frame.wordSize * n)) ^"($sp)",
                         src=[munchExp arg_exp, Frame.SP],
                         dst=[],
                         jump=NONE
@@ -260,7 +262,7 @@ fun codegen frame stm =
         | munchExp (T.BINOP (T.PLUS, T.TEMP src, T.CONST const)) =
           result(fn (r)=> 
                     emit(A.OPER{
-                              assem="addi `d0, `s0, "^ (Int.toString const),
+                              assem="addi `d0, `s0, "^ (int2string const),
                               src=[src],
                               dst=[r],
                               jump=NONE
@@ -269,7 +271,7 @@ fun codegen frame stm =
         | munchExp (T.BINOP (T.PLUS, T.CONST const, T.TEMP src)) =
           result(fn (r)=> 
                     emit(A.OPER{
-                              assem="addi `d0, `s0, "^ (Int.toString const),
+                              assem="addi `d0, `s0, "^ (int2string const),
                               src=[src],
                               dst=[r],
                               jump=NONE
@@ -278,7 +280,7 @@ fun codegen frame stm =
         | munchExp (T.BINOP (T.PLUS, exp1, T.CONST const)) =
           result(fn (r)=> 
                     emit(A.OPER{
-                              assem="addi `d0, `s0, " ^(Int.toString const),
+                              assem="addi `d0, `s0, " ^(int2string const),
                               src=[munchExp exp1],
                               dst=[r],
                               jump=NONE
@@ -287,7 +289,7 @@ fun codegen frame stm =
         | munchExp (T.BINOP (T.PLUS, T.CONST const, exp1)) =
           result(fn (r)=> 
                     emit(A.OPER{
-                              assem="addi `d0, `s0, " ^(Int.toString const),
+                              assem="addi `d0, `s0, " ^(int2string const),
                               src=[munchExp exp1],
                               dst=[r],
                               jump=NONE
@@ -361,7 +363,7 @@ fun codegen frame stm =
         | munchExp (T.MEM (T.BINOP(T.PLUS, T.TEMP src, T.CONST offset))) =
           result (fn (r)=>
                      emit(A.OPER{
-                               assem="lw `d0, "^(Int.toString offset)^"(`s0)",
+                               assem="lw `d0, "^(int2string offset)^"(`s0)",
                                src=[src],
                                dst=[r],
                                jump=NONE
@@ -370,7 +372,7 @@ fun codegen frame stm =
         | munchExp (T.MEM (T.BINOP(T.PLUS, src_exp, T.CONST offset))) =
           result (fn (r)=>
                      emit(A.OPER{
-                               assem="lw `d0, "^(Int.toString offset)^"(`s0)",
+                               assem="lw `d0, "^(int2string offset)^"(`s0)",
                                src=[munchExp src_exp],
                                dst=[r],
                                jump=NONE
@@ -398,7 +400,7 @@ fun codegen frame stm =
         | munchExp (T.CONST c) =
           result (fn (r) =>
                      emit(A.OPER{
-                               assem="li `d0, "^ (Int.toString c),
+                               assem="li `d0, "^ (int2string c),
                                src=[],
                                dst=[r],
                                jump=NONE
@@ -406,26 +408,26 @@ fun codegen frame stm =
                  )
         | munchExp (T.CALL(T.NAME func_label, params)) =
           result ( fn (r) => (
-                       emit(A.OPER{
-                                 assem="sub $sp, $sp, " ^
-                                       (Int.toString (Frame.wordSize * (List.length params))),
-                                 src=[Frame.SP],
-                                 dst=[Frame.SP],
-                                 jump=NONE
-                           });
+                       (* emit(A.OPER{ *)
+                       (*           assem="sub $sp, $sp, " ^ *)
+                       (*                 (int2string (Frame.wordSize * (List.length params))), *)
+                       (*           src=[Frame.SP], *)
+                       (*           dst=[Frame.SP], *)
+                       (*           jump=NONE *)
+                       (*     }); *)
                        emit(A.OPER{
                                  assem="jal "^(Symbol.name func_label),
                                  src= munchArgs (0, params),
                                  dst = calldefs,
                                  jump=NONE
                            });
-                       emit(A.OPER{
-                                 assem="add $sp, $sp, " ^
-                                       (Int.toString (Frame.wordSize * (List.length params))),
-                                 src=[Frame.SP],
-                                 dst=[Frame.SP],
-                                 jump=NONE
-                           });
+                       (* emit(A.OPER{ *)
+                       (*           assem="add $sp, $sp, " ^ *)
+                       (*                 (int2string (Frame.wordSize * (List.length params))), *)
+                       (*           src=[Frame.SP], *)
+                       (*           dst=[Frame.SP], *)
+                       (*           jump=NONE *)
+                       (*     }); *)
                        emit(A.MOVE{
                                  assem="move `d0, $v0",
                                  src=Frame.RV,

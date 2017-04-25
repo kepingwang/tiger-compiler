@@ -130,23 +130,33 @@ fun exp access exp =
 
 fun allocLocalImpl stack_local_count true =
   let
-      val newLocal = InFrame ((!stack_local_count * wordSize))
+      val _ = stack_local_count := !stack_local_count + 1;
+      val newLocal = InFrame (~(!stack_local_count * wordSize))
   in
-      stack_local_count := !stack_local_count + 1;
       newLocal
   end
-  | allocLocalImpl stack_local_count false = (stack_local_count := !stack_local_count+1;  InReg (Temp.newtemp()))
+  | allocLocalImpl stack_local_count false = (InReg (Temp.newtemp()))
+
+fun locateParam index true = InFrame (index * wordSize)
+  | locateParam index false =InReg (Temp.newtemp())
+
+val max_out_count = ref 0
 
 fun newFrame {func_name, name, formals = formals_esc} =
   (* formals: true for each escape parameter *)
   let
-      val stack_local_count = ref 0
-      val formals_access = map (allocLocalImpl stack_local_count) formals_esc
+      val (formals_access, formal_count) = foldl (fn (esc, (access_list, index)) =>
+                                     (access_list @ [(locateParam index esc)], index+1)
+                                 ) ([], 0) formals_esc
   in
+      max_out_count := (if formal_count > !max_out_count then
+                           formal_count
+                       else
+                           !max_out_count);
       {func_name=func_name,
        name=name,
 	   formals=formals_access,
-	   stack_local_count=stack_local_count}
+	   stack_local_count=ref 1}
   end
 
 fun name {name, formals, stack_local_count, func_name} = name
@@ -204,6 +214,7 @@ fun procEntryExit1 (frame , body) =
             )
         end
       val body = foldl saveLoadReg body calleesaves
+      val body = foldl saveLoadReg body [RA]
   in
       body
   end
@@ -214,9 +225,23 @@ fun procEntryExit2 (frame, body_instr) =
                        src=[ZERO, RA, SP, FP] @ calleesaves,
                        dst=[],
                        jump=SOME[]}]
-fun procEntryExit3 ({func_name, name, formals, stack_local_count}, body_instr) = {
-    prolog = ".text\n# Procedure " ^ func_name ^ "\n",
-    body = Assem.LABEL {assem=(Symbol.name name)^":", lab=name}:: body_instr,
-    epilog = "# End " ^ func_name ^ "\n"
-}
+fun procEntryExit3 ({func_name, name, formals, stack_local_count}, body_instr) =
+  let
+      val fsize = (!max_out_count + !stack_local_count) * wordSize
+      val prolog = ".text\n# Procedure " ^ func_name ^ "\n"
+      val prolog = prolog ^ (Symbol.name name) ^":\n"
+      val prolog = prolog ^ "sw $fp, -" ^ (Int.toString wordSize) ^ "($sp)\n"
+      val prolog = prolog ^ "move $fp, $sp\n"
+      val prolog = prolog ^ "sub $sp, " ^ (Int.toString fsize) ^ "\n"
+      val epilog = "add $sp, " ^ (Int.toString fsize) ^ "\n"
+      val epilog = epilog ^ "lw $fp, -" ^ (Int.toString wordSize) ^ "($sp)\n"
+      val epilog = epilog ^ "# End " ^ func_name ^ "\n"
+
+  in
+      {
+        prolog = prolog,
+        body = body_instr,
+        epilog = epilog
+      }
+  end
 end
