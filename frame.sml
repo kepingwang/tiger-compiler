@@ -84,7 +84,6 @@ val allRegs = [
     ("s7", Temp.newtemp()),
     ("t8", Temp.newtemp()),
     ("t9", Temp.newtemp()),
-    ("gp", Temp.newtemp()),
     ("sp", Temp.newtemp()),
     ("fp", Temp.newtemp()),
     ("ra", Temp.newtemp())
@@ -108,7 +107,7 @@ val specialRegs = [
   ZERO, RV, SP, FP, RA
 ]
 val callersaves = findRegTemps ["t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9",
-                                "gp", "v1", "a0", "a1", "a2", "a3"
+                                "v1", "a0", "a1", "a2", "a3"
                                ]
 val calleesaves = findRegTemps ["s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7"]
 
