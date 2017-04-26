@@ -1,4 +1,3 @@
-/* define a recursive function */
 let
 
 function readint() : int =
@@ -22,15 +21,10 @@ function printint(i: int) =
       else print("0")
   end
 
-
-/* calculate n! */
-function nfactor(n: int): int =
-		if  n = 0 
-			then 1
-			else n * nfactor(n-1)
-            var i := readint()
-
 in
-    printint(nfactor(i))
+    while 1 do
+    (
+             
+    )
 end
 

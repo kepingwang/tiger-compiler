@@ -233,7 +233,7 @@ fun initBeforeBody (init_exp_list, body_exp) =
 (*length is added by initArray*)
 fun array (size_exp, init_exp) =
   Ex (
-      Frame.externalCall ("tig_initArray", [unEx size_exp, unEx init_exp])
+      T.BINOP(T.PLUS, Frame.externalCall ("tig_initArray", [unEx size_exp, unEx init_exp]), T.CONST 4)
   )
 
 fun arraySubscript (var_exp, index_exp) =
@@ -242,12 +242,12 @@ fun arraySubscript (var_exp, index_exp) =
       val index_reg = Temp.newtemp()
       val assign_addr_stmt = T.MOVE(T.TEMP var_addr_reg, unEx var_exp)
       val assign_index_stmt = T.MOVE(T.TEMP index_reg, unEx index_exp)
-      val get_size_exp = T.MEM(T.BINOP(T.MINUS, T.TEMP var_addr_reg, T.CONST 1))
+      val get_size_exp = T.MEM(T.BINOP(T.MINUS, T.TEMP var_addr_reg, T.CONST Frame.wordSize))
       val valid_lb = Temp.newlabel()
       val invalid_lb = Temp.newlabel()
       val check_stmt = T.CJUMP (T.LT, T.TEMP index_reg, get_size_exp, valid_lb, invalid_lb)
       val exit_stmt = T.EXP (Frame.externalCall ("exit", [T.CONST 1]))
-      val get_exp = T.MEM (T.BINOP (T.PLUS, T.TEMP var_addr_reg, T.TEMP index_reg))
+      val get_exp = T.MEM (T.BINOP (T.PLUS, T.TEMP var_addr_reg, T.BINOP(T.MUL, T.TEMP index_reg, T.CONST Frame.wordSize)))
   in
       Ex (T.ESEQ (
       seq[
