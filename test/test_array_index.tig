@@ -1,6 +1,20 @@
 let
     type arrtype = array of int
     var x := arrtype [11] of 7
+
+ function printint(i: int) =
+  let function f(i:int) = if i>0 
+	     then (f(i/10); print(chr(i-i/10*10+ord("0"))))
+   in if i<0 then (print("-"); f(-i))
+      else if i>0 then f(i)
+      else print("0")
+  end
+  
 in
-    x[0] := 63
+(
+x[0] := 63;
+x[1] := 62;
+for i := 0 to 10 do (printint(x[i]); print(" "));
+print("\n")
+)
 end 
