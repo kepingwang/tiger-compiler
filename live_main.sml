@@ -186,9 +186,23 @@ structure Main = struct
  fun compile filename = 
    let val absyn_tree = Parse.parse filename
        val frags = Semant.transProg absyn_tree
+       val runtime_ins = TextIO.openIn "runtimele.s"
+       val sys_ins = TextIO.openIn "sysspim.s"
+       fun readAll (ins, outs) =
+                   let
+                       val str_op = TextIO.inputLine ins
+                   in
+                       case str_op of
+                           SOME(s) => (TextIO.output (outs, s); readAll (ins, outs))
+                         | NONE => ()
+                   end
    in
-       withOpenFile (filename ^ ".s") 
-	                (fn out => (app (emitproc out) frags))
+       withOpenFile (filename ^ ".s")
+	                (fn out =>
+                        (readAll (runtime_ins, out);
+                         readAll (sys_ins, out);
+                         (app (emitproc out) frags))
+                    )
    end
 
 end

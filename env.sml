@@ -21,62 +21,62 @@ val base_venv = S.empty
 val base_venv = S.enter (base_venv, S.symbol "print",
                          FunEntry {formals=[T.STRING], level=Trans.newLevel {
                                                            func_name="print",
-                                                           parent=Trans.outermost,
+                                                           parent=Trans.liblevel,
                                                            formals=[false]}
                                    , result=T.UNIT})
 val base_venv = S.enter (base_venv, S.symbol "flush",
                          FunEntry {formals=[], level=Trans.newLevel {
                                                    func_name="flush",
-                                                   parent=Trans.outermost,
+                                                   parent=Trans.liblevel,
                                                    formals=[]}
                                    , result=T.UNIT})
 val base_venv = S.enter (base_venv, S.symbol "getchar",
                          FunEntry {formals=[], level=Trans.newLevel {
                                                    func_name="getchar",
-                                                   parent=Trans.outermost,
+                                                   parent=Trans.liblevel,
                                                    formals=[]}
                                    , result=T.STRING})
 val base_venv = S.enter (base_venv, S.symbol "ord",
 			             FunEntry {formals=[T.STRING], level=Trans.newLevel {
                                                            func_name="ord",
-                                                           parent=Trans.outermost,
+                                                           parent=Trans.liblevel,
                                                            formals=[false]}
 
                                    , result=T.INT})
 val base_venv = S.enter (base_venv, S.symbol "chr",
                          FunEntry {formals=[T.INT], level=Trans.newLevel {
                                                         func_name="chr",
-                                                        parent=Trans.outermost,
+                                                        parent=Trans.liblevel,
                                                         formals=[false]}
                                    , result=T.STRING})
 val base_venv = S.enter (base_venv, S.symbol "size",
                          FunEntry {formals=[T.STRING], level=Trans.newLevel {
                                                            func_name="size",
-                                                           parent=Trans.outermost,
+                                                           parent=Trans.liblevel,
                                                            formals=[false]}
 , result=T.INT})
 val base_venv = S.enter (base_venv, S.symbol "substring",
                          FunEntry {formals=[T.STRING, T.INT, T.INT], level=Trans.newLevel {
                                                                          func_name="substring",
-                                                                         parent=Trans.outermost,
+                                                                         parent=Trans.liblevel,
                                                                          formals=[false, false, false]}
 , result=T.STRING})
 val base_venv = S.enter (base_venv, S.symbol "concat",
                          FunEntry {formals=[T.STRING, T.STRING], level=Trans.newLevel {
                                                                      func_name="concat",
-                                                                     parent=Trans.outermost,
+                                                                     parent=Trans.liblevel,
                                                                      formals=[false, false]}
 , result=T.STRING})
 val base_venv = S.enter (base_venv, S.symbol "not",
                          FunEntry {formals=[T.INT], level=Trans.newLevel {
                                                         func_name="not",
-                                                        parent=Trans.outermost,
+                                                        parent=Trans.liblevel,
                                                         formals=[false]}
 , result=T.INT})
 val base_venv = S.enter (base_venv, S.symbol "exit",
                          FunEntry {formals=[T.INT], level=Trans.newLevel {
                                                         func_name="exit",
-                                                        parent=Trans.outermost,
+                                                        parent=Trans.liblevel,
                                                         formals=[false]}
 , result=T.UNIT})
 end

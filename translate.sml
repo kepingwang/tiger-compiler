@@ -4,6 +4,7 @@ sig
   type access (* not the same as Frame.access *) (* access of a var*)
 
   val outermost : level
+  val liblevel : level
   val newLevel : { (* newLevel calls newFrame *)
     (* semant.sml only knows about level, doesn't know about frame *)
     (* when calling Frame.newFrame, Translate passes static link as
@@ -52,6 +53,7 @@ struct
 structure Frame : FRAME = MipsFrame
 datatype level = LEVEL of {parent: level, frame: Frame.frame, uniq: unit ref}
                | OUTERMOST of {frame: Frame.frame}(* ? *)
+       | LIBLEVEL
 (* level needs to be kept track of *)
 type access = level * Frame.access
 type frag = Frame.frag
@@ -59,14 +61,18 @@ type frag = Frame.frag
 fun getFrame (LEVEL {frame, ...}) = frame
   | getFrame (OUTERMOST {frame, ...}) = frame
 fun parentLevel (LEVEL {parent, ...}) = parent
-  | parentLevel outerlevel = outerlevel
-fun newLevel {func_name, parent, formals} =
-  (* pass static link as an extra element *)
-  LEVEL {parent=parent,
-         frame=Frame.newFrame {func_name = func_name, name=Temp.newlabel(), formals=true::formals},
+fun newLevel {func_name, parent=LIBLEVEL, formals} =
+  LEVEL {parent=LIBLEVEL,
+         frame=Frame.newFrame {func_name = func_name, name=Temp.namedlabel ("tig_" ^ func_name), formals=formals},
+         uniq=ref ()}
+  | newLevel {func_name, parent, formals} =
+    (* pass static link as an extra element *)
+    LEVEL {parent=parent,
+           frame=Frame.newFrame {func_name = func_name, name=Temp.newlabel(), formals=true::formals},
          uniq=ref ()}
 fun levelName level = Frame.name (getFrame level)
 val outermost = OUTERMOST {frame=Frame.newFrame {func_name="main", name = Temp.mainlabel, formals = [true] } }
+val liblevel = LIBLEVEL
 structure A = Absyn
 type Aexp = A.oper
 structure T = Tree
@@ -170,7 +176,9 @@ fun call (call_level, dec_level, exp_list) =
       val func_label = levelName dec_level
       val arg_list = map unEx exp_list
   in
-      Ex (Tree.CALL (Tree.NAME func_label, traceStaticLink(parentLevel dec_level, call_level, T.TEMP Frame.FP) :: arg_list))
+      case parentLevel dec_level of
+          LIBLEVEL =>  Ex (Tree.CALL (Tree.NAME func_label, arg_list))
+       | _ => Ex (Tree.CALL (Tree.NAME func_label, traceStaticLink(parentLevel dec_level, call_level, T.TEMP Frame.FP) :: arg_list))
   end
 
 
@@ -225,7 +233,7 @@ fun initBeforeBody (init_exp_list, body_exp) =
 (*length is added by initArray*)
 fun array (size_exp, init_exp) =
   Ex (
-      Frame.externalCall ("initArray", [unEx size_exp, unEx init_exp])
+      Frame.externalCall ("tig_initArray", [unEx size_exp, unEx init_exp])
   )
 
 fun arraySubscript (var_exp, index_exp) =
@@ -272,8 +280,8 @@ fun binop (A.PlusOp, Ex(T.CONST 0), right_exp) = Ex ( unEx right_exp)
 
 fun stringRelop (Aoper, left_exp, right_exp) =
   case Aoper of
-      A.EqOp => Ex (Frame.externalCall ("stringEqual", [unEx left_exp, unEx right_exp]))
-    | A.NeqOp => Ex (T.BINOP(T.MINUS, T.CONST 1, Frame.externalCall ("stringEqual", [unEx left_exp, unEx right_exp])))
+      A.EqOp => Ex (Frame.externalCall ("tig_stringEqual", [unEx left_exp, unEx right_exp]))
+    | A.NeqOp => Ex (T.BINOP(T.MINUS, T.CONST 1, Frame.externalCall ("tig_stringEqual", [unEx left_exp, unEx right_exp])))
     | _ => Ex (T.CONST 0)
 fun relop (A_oper, left_exp, right_exp) =
   let

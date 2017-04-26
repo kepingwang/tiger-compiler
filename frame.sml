@@ -167,7 +167,7 @@ fun allocLocal {name, formals, stack_local_count, func_name} esc = allocLocalImp
 
 fun externalCall (name, param_list) = Tree.CALL(Tree.NAME(Temp.namedlabel(name)), param_list)
 
-fun string  (label, str) = ".data\n" ^(Symbol.name label) ^ ":\n .asciiz \"" ^ str ^"\"\n"
+fun string  (label, str) = ".data\n.align 2\n" ^(Symbol.name label) ^ ":\n.word " ^ (Int.toString (String.size str)) ^ "\n.ascii \"" ^ str ^"\"\n"
 structure T = Tree
 fun procEntryExit1 (frame , body) =
   let
@@ -235,6 +235,7 @@ fun procEntryExit3 ({func_name, name, formals, stack_local_count}, body_instr) =
       val prolog = prolog ^ "sub $sp, " ^ (Int.toString fsize) ^ "\n"
       val epilog = "add $sp, " ^ (Int.toString fsize) ^ "\n"
       val epilog = epilog ^ "lw $fp, -" ^ (Int.toString wordSize) ^ "($sp)\n"
+      val epilog = epilog ^ "jr $ra\n"
       val epilog = epilog ^ "# End " ^ func_name ^ "\n"
 
   in
