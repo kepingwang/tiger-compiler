@@ -18,7 +18,8 @@ fun traverseVar(env, d, A.SimpleVar (name, _)) =
       then escape := true
       else ()
   end
-  | traverseVar (env, d, _) =  ()
+  | traverseVar (env, d, A.FieldVar (var, _, _)) =  (traverseVar(env, d, var))
+  | traverseVar (env, d, A.SubscriptVar (var, _, _)) = (traverseVar(env, d, var))
 and traverseExp (env, d) =
     let
         fun trexp (A.VarExp var) = traverseVar(env, d, var)
@@ -57,8 +58,10 @@ and traverseExp (env, d) =
                 traverseExp (env', d) body
             end
           | trexp (A.ArrayExp {size, init, ...})  = (trexp size; trexp init)
-          | trexp _ = ()
-
+          | trexp (A.BreakExp _) = ()
+          | trexp (A.NilExp) = ()
+          | trexp (A.IntExp _) = ()
+          | trexp (A.StringExp _) = ()
     in
         trexp
     end

@@ -1,0 +1,10 @@
+let
+type inta = array of int
+var x:= inta[1] of 42
+var y:= 41
+
+function try():int = x[0]
+
+in
+    try()
+end

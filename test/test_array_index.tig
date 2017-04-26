@@ -1,5 +1,7 @@
 let
     type arrtype = array of int
+
+
     var x := arrtype [11] of 7
 
  function printint(i: int) =
@@ -17,4 +19,5 @@ x[1] := 62;
 for i := 0 to 10 do (printint(x[i]); print(" "));
 print("\n")
 )
+
 end 
