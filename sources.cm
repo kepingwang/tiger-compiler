@@ -27,7 +27,7 @@ funcgraph.sig
 funcgraph.sml
 flowgraph.sml
 liveness.sml
-live_main.sml
+main.sml
 color.sml
 reg.sml
 $/smlnj-lib.cm
