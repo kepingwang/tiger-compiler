@@ -29,6 +29,7 @@ sig
   val procEntryExit1 : frame * Tree.stm -> Tree.stm
   val procEntryExit2 : frame * Assem.instr list -> Assem.instr list
   val procEntryExit3 : frame * Assem.instr list -> {prolog:string, body:Assem.instr list, epilog : string}
+  val spillTemp : frame * Tree.stm * Temp.temp -> Tree.stm
   val wordSize : int
   val exp : access -> Tree.exp -> Tree.exp
   val externalCall: string * Tree.exp list -> Tree.exp
@@ -203,7 +204,7 @@ fun procEntryExit1 (frame , body) =
 
       fun saveLoadReg (temp, stmt) =
         let
-            val access = allocLocal frame true
+            val access = allocLocal frame false
             val location_exp = exp access (T.TEMP FP)
         in
             T.SEQ(
@@ -244,5 +245,26 @@ fun procEntryExit3 ({func_name, name, formals, stack_local_count}, body_instr) =
         body = body_instr,
         epilog = epilog
       }
+  end
+fun spillTemp (frame, stmt, spill_temp) =
+  let
+      val local_var = allocLocal frame true
+      val spill_loc = exp local_var (T.TEMP FP)
+      fun spstmt (T.SEQ (stmt1, stmt2)) = T.SEQ(spstmt stmt1, spstmt stmt2)
+        | spstmt (T.LABEL l) = T.LABEL l
+        | spstmt (T.JUMP (exp, l)) = T.JUMP (spexp exp, l)
+        | spstmt (T.CJUMP (r, exp1, exp2, l1, l2)) =
+          T.CJUMP(r, spexp exp1, spexp exp2, l1, l2)
+        | spstmt (T.MOVE(exp1, exp2)) = T.MOVE(spexp exp1, spexp exp2)
+        | spstmt (T.EXP (exp)) = T.EXP (spexp exp)
+      and spexp (T.BINOP (b, exp1, exp2)) = T.BINOP (b, spexp exp1, spexp exp2)
+        | spexp (T.MEM exp) = T.MEM (spexp exp)
+        | spexp (T.TEMP temp)= if temp = spill_temp then spill_loc else T.TEMP temp
+        | spexp (T.ESEQ (stmt, exp)) = T.ESEQ (spstmt stmt, spexp exp)
+        | spexp (T.NAME l) = T.NAME l
+        | spexp (T.CONST i) = T.CONST i
+        | spexp (T.CALL (exp, exp_l)) = T.CALL (spexp exp, map spexp exp_l)
+  in
+      spstmt stmt
   end
 end

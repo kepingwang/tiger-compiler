@@ -1,0 +1,46 @@
+let
+function readint() : int =
+ let var i := 0
+     var buffer := getchar()
+     function isdigit(s : string) : int = 
+		  ord(buffer)>=ord("0") & ord(buffer)<=ord("9")
+     function skipto() =
+       while buffer=" " | buffer="\n"
+         do buffer := getchar()
+  in skipto();
+     while isdigit(buffer)
+       do (i := i*10+ord(buffer)-ord("0"); buffer := getchar());
+     i
+ end
+function printint(i: int) =
+  let function f(i:int) = if i>0 
+	     then (f(i/10); print(chr(i-i/10*10+ord("0"))))
+   in if i<0 then (print("-"); f(-i))
+      else if i>0 then f(i)
+      else print("0")
+  end
+
+
+    var x0 := 1
+    var x1 := 2
+    var x2 := 3
+    var x3 := 4
+    var x4 := 5
+    var x5 := 6
+    var x6 := 7
+    var x7 := 8
+    var x8 := 9
+    var x9 := 10
+    var x10 := 11
+    var x11 := 12
+    var x12 := 13
+    var x13 := 14
+    var x14 := 15
+    function f(x0:int, x1:int, x2:int, x3:int, x4:int,
+               x5:int, x6:int, x7:int, x8:int, x9:int,
+               x10:int, x11:int, x12:int, x13:int, x14:int):int
+    =x0+x1+x2+x3+x4+x5+x6+x7+x8+x9+x10+x11+x12+x13+x14
+in
+    printint(f(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14)+
+    x0+x1+x2+x3+x4+x5+x6+x7+x8+x9+x10+x11+x12+x13+x14)
+end

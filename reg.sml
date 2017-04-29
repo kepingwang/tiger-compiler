@@ -3,7 +3,7 @@ sig
     structure Frame : FRAME
     type allocation = Frame.register Temp.Map.map
     val alloc : Assem.instr list * Frame.frame ->
-                Assem.instr list * allocation
+                allocation * Temp.temp list
 end
 
 structure RegAlloc : REG_ALLOC =
@@ -23,12 +23,8 @@ fun alloc (assems, frame) =
           spillCost=(fn x => 1), (* not used now *)
           registers=Frame.registers
         }
-    (* TODO: if spill, change assems *)
-    val () = case List.length spillList of
-                 0 => ()
-               | _ => raise Spill
   in
-    (assems, allocation)
+    (allocation, spillList)
   end
 end
                        
